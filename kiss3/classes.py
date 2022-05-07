@@ -3,30 +3,22 @@
 
 """Python KISS Module Class Definitions."""
 
-import logging
+import abc
 import socket
 
 import serial
 
-from . import constants, util
+from . import constants, exceptions, util
 
 __author__ = 'Greg Albrecht W2GMD <oss@undef.net>'  # NOQA pylint: disable=R0801
 __copyright__ = 'Copyright 2017 Greg Albrecht and Contributors'  # NOQA pylint: disable=R0801
 __license__ = 'Apache License, Version 2.0'  # NOQA pylint: disable=R0801
 
 
-class KISS(object):
+class KISS(abc.ABC):
+    """KISS Object Abstract Class."""
 
-    """KISS Object Class."""
-
-    _logger = logging.getLogger(__name__)  # pylint: disable=R0801
-    if not _logger.handlers:  # pylint: disable=R0801
-        _logger.setLevel(constants.LOG_LEVEL)  # pylint: disable=R0801
-        _console_handler = logging.StreamHandler()  # pylint: disable=R0801
-        _console_handler.setLevel(constants.LOG_LEVEL)  # pylint: disable=R0801
-        _console_handler.setFormatter(constants.LOG_FORMAT)  # pylint: disable=R0801
-        _logger.addHandler(_console_handler)  # pylint: disable=R0801
-        _logger.propagate = False  # pylint: disable=R0801
+    _logger = util.getLogger(__name__)  # pylint: disable=R0801
 
     def __init__(self, strip_df_start: bool=False) -> None:
         self.strip_df_start = strip_df_start
@@ -41,24 +33,26 @@ class KISS(object):
     def __del__(self):
         self.stop()
 
+    @abc.abstractmethod
     def _read_handler(self, read_bytes=None):  # pylint: disable=R0201
         """
         Helper method to call when reading from KISS interface.
         """
-        read_bytes = read_bytes or constants.READ_BYTES
 
+    @abc.abstractmethod
     def _write_handler(self, frame=None):  # pylint: disable=R0201
         """
         Helper method to call when writing to KISS interface.
         """
-        del frame
 
+    @abc.abstractmethod
     def stop(self):
         """
         Helper method to call when stopping KISS interface.
         """
         pass
 
+    @abc.abstractmethod
     def start(self, **kwargs):
         """
         Helper method to call when starting KISS interface.
@@ -83,7 +77,7 @@ class KISS(object):
         return self.interface.write(
             b''.join([
                 constants.FEND,
-                bytes(getattr(kiss, name.upper())),
+                bytes(getattr(constants, name.upper())),
                 util.escape_special_codes(value),
                 constants.FEND
             ])
@@ -209,13 +203,21 @@ class TCPKISS(KISS):
     def __init__(self, host, port, strip_df_start=False):
         self.address = (host, int(port))
         self.strip_df_start = strip_df_start
-        super(TCPKISS, self).__init__(strip_df_start)
+        super().__init__(strip_df_start)
 
     def _read_handler(self, read_bytes=None):
         read_bytes = read_bytes or constants.READ_BYTES
         read_data = self.interface.recv(read_bytes)
         self._logger.debug('len(read_data)=%s', len(read_data))
         return read_data
+
+    def _write_handler(self, frame=None):
+        if not frame:
+            return
+        if self.interface:
+            self.interface.send(frame)
+        else:
+            raise exceptions.SocketClosedError
 
     def stop(self):
         if self.interface:
@@ -229,7 +231,6 @@ class TCPKISS(KISS):
         self._logger.debug('Conntecting to %s', self.address)
         self.interface.connect(self.address)
         self._logger.info('Connected to %s', self.address)
-        self._write_handler = self.interface.send
 
 
 class SerialKISS(KISS):
@@ -249,15 +250,16 @@ class SerialKISS(KISS):
         if len(read_data) > 0:
             self._logger.debug('len(read_data)=%s', len(read_data))
 
-        try:
-            waiting_data = self.interface.in_waiting
-        except AttributeError:
-            waiting_data = self.interface.outWaiting()
-
+        waiting_data = self.interface.in_waiting
         if waiting_data:
             self._logger.debug('waiting_data=%s', waiting_data)
             read_data += self.interface.read(waiting_data)
         return read_data
+
+    def _write_handler(self, frame=None):
+        if not frame:
+            return
+        self.interface.write(frame)
 
     def _write_defaults(self, **kwargs):
         """
@@ -304,7 +306,6 @@ class SerialKISS(KISS):
         self._logger.debug('kwargs=%s', kwargs)
         self.interface = serial.Serial(self.port, self.speed)
         self.interface.timeout = constants.SERIAL_TIMEOUT
-        self._write_handler = self.interface.write
         self._write_defaults(**kwargs)
 
     def start_no_config(self):
@@ -313,4 +314,3 @@ class SerialKISS(KISS):
         """
         self.interface = serial.Serial(self.port, self.speed)
         self.interface.timeout = constants.SERIAL_TIMEOUT
-        self._write_handler = self.interface.write
