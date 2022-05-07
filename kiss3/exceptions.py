@@ -8,6 +8,10 @@ __copyright__ = 'Copyright 2017 Greg Albrecht and Contributors'  # NOQA pylint: 
 __license__ = 'Apache License, Version 2.0'  # NOQA pylint: disable=R0801
 
 
-class SocketClosetError(Exception):
+class SocketClosedError(Exception):
     """Socket Closed Error."""
     pass
+
+
+# for compatibility
+SocketClosetError = SocketClosedError
