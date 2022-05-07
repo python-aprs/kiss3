@@ -1,7 +1,6 @@
-#!/usr/bin/env python
 # -*- coding: utf-8 -*-
-
 """Python KISS Module Utility Functions Definitions."""
+import logging
 
 from . import constants
 
@@ -90,3 +89,18 @@ def strip_nmea(frame):
         if frame[0] == 240:
             return frame[1:].rstrip()
     return frame
+
+
+def getLogger(name):
+    """
+    Get a logger hooked up with the appropriate levels and outputs.
+    """
+    logger = logging.getLogger(name)
+
+    if not logger.handlers:
+        logger.setLevel(constants.LOG_LEVEL)
+        console_handler = logging.StreamHandler()
+        console_handler.setLevel(constants.LOG_LEVEL)
+        console_handler.setFormatter(constants.LOG_FORMAT)
+        logger.addHandler(console_handler)
+    return logger
