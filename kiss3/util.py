@@ -4,9 +4,11 @@ import logging
 
 from . import constants
 
-__author__ = 'Greg Albrecht W2GMD <oss@undef.net>'  # NOQA pylint: disable=R0801
-__copyright__ = 'Copyright 2017 Greg Albrecht and Contributors'  # NOQA pylint: disable=R0801
-__license__ = 'Apache License, Version 2.0'  # NOQA pylint: disable=R0801
+__author__ = "Greg Albrecht W2GMD <oss@undef.net>"  # NOQA pylint: disable=R0801
+__copyright__ = (
+    "Copyright 2017 Greg Albrecht and Contributors"  # NOQA pylint: disable=R0801
+)
+__license__ = "Apache License, Version 2.0"  # NOQA pylint: disable=R0801
 
 
 def escape_special_codes(raw_codes):
@@ -18,12 +20,9 @@ def escape_special_codes(raw_codes):
     FESC is then sent as FESC, TFESC."
     - http://en.wikipedia.org/wiki/KISS_(TNC)#Description
     """
-    return raw_codes.replace(
-        constants.FESC,
-        constants.FESC_TFESC
-    ).replace(
+    return raw_codes.replace(constants.FESC, constants.FESC_TFESC).replace(
         constants.FEND,
-        constants.FESC_TFEND
+        constants.FESC_TFEND,
     )
 
 
@@ -42,7 +41,7 @@ def recover_special_codes(escaped_codes):
         if escaped_codes[i] == constants.FESC[0] and i + 1 < len(escaped_codes):
             if escaped_codes[i + 1] == constants.TFESC[0]:
                 out.append(constants.FESC[0])
-                i += 1 #Skips over the next byte, which would be the TFESC
+                i += 1  # Skips over the next byte, which would be the TFESC
             elif escaped_codes[i + 1] == constants.TFEND[0]:
                 out.append(constants.FEND[0])
                 i += 1
@@ -54,6 +53,7 @@ def recover_special_codes(escaped_codes):
 
     return out
 
+
 def extract_ui(frame):
     """
     Extracts the UI component of an individual frame.
@@ -63,10 +63,11 @@ def extract_ui(frame):
     :returns: UI component of frame.
     :rtype: str
     """
-    start_ui = frame.split(
-        b''.join([constants.FEND, constants.DATA_FRAME]))
-    end_ui = start_ui[0].split(b''.join([constants.SLOT_TIME, constants.UI_PROTOCOL_ID]))
-    return ''.join([chr(x >> 1) for x in end_ui[0]])
+    start_ui = frame.split(b"".join([constants.FEND, constants.DATA_FRAME]))
+    end_ui = start_ui[0].split(
+        b"".join([constants.SLOT_TIME, constants.UI_PROTOCOL_ID]),
+    )
+    return "".join([chr(x >> 1) for x in end_ui[0]])
 
 
 def strip_df_start(frame):
