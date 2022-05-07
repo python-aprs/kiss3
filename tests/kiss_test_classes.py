@@ -9,7 +9,7 @@ import unittest
 
 import aprs
 
-from .context import kiss
+from .context import kiss3
 
 from . import constants
 
@@ -24,10 +24,10 @@ class KISSTestClass(unittest.TestCase):  # pylint: disable=R0904
 
     _logger = logging.getLogger(__name__)  # pylint: disable=R0801
     if not _logger.handlers:  # pylint: disable=R0801
-        _logger.setLevel(kiss.LOG_LEVEL)  # pylint: disable=R0801
+        _logger.setLevel(kiss3.LOG_LEVEL)  # pylint: disable=R0801
         _console_handler = logging.StreamHandler()  # pylint: disable=R0801
-        _console_handler.setLevel(kiss.LOG_LEVEL)  # pylint: disable=R0801
-        _console_handler.setFormatter(kiss.LOG_FORMAT)  # pylint: disable=R0801
+        _console_handler.setLevel(kiss3.LOG_LEVEL)  # pylint: disable=R0801
+        _console_handler.setFormatter(kiss3.LOG_FORMAT)  # pylint: disable=R0801
         _logger.addHandler(_console_handler)  # pylint: disable=R0801
         _logger.propagate = False  # pylint: disable=R0801
 

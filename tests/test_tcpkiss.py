@@ -10,7 +10,7 @@ import aprs
 from mocket.mocket import (Mocket, MocketEntry, MocketSocket, mocketize,
                            create_connection)
 
-from .context import kiss
+from .context import kiss3
 from .context import kiss_test_classes  # pylint: disable=R0801
 
 from . import constants
@@ -51,7 +51,7 @@ class TCPKISSTestCase(kiss_test_classes.KISSTestClass):
         aprs_frame = aprs.Frame(frame)
         kiss_frame = aprs_frame.encode_kiss()
 
-        ks = kiss.TCPKISS(host=self.random_host, port=self.random_port)
+        ks = kiss3.TCPKISS(host=self.random_host, port=self.random_port)
         a = (self.random_host, self.random_port)
 
         entry = MocketEntry(a, kiss_frame)
@@ -82,7 +82,7 @@ class TCPKISSTestCase(kiss_test_classes.KISSTestClass):
         aprs_frame = aprs.Frame(frame)
         kiss_frame = aprs_frame.encode_kiss()
 
-        ks = kiss.TCPKISS(host=self.random_host, port=self.random_port)
+        ks = kiss3.TCPKISS(host=self.random_host, port=self.random_port)
         a = (self.random_host, self.random_port)
 
         entry = MocketEntry(a, [kiss_frame])
@@ -107,7 +107,7 @@ class TCPKISSTestCase(kiss_test_classes.KISSTestClass):
         #    'frame_kiss(%s)="%s"', len(frame_kiss), frame_kiss)
         # self._logger.debug(
         #    'read_data(%s)="%s"', len(read_data), read_data)
-        # self.assertEqual(read_data, frame_kiss.split(kiss.FEND)[1])
+        # self.assertEqual(read_data, frame_kiss3.split(kiss3.FEND)[1])
 
 
 if __name__ == '__main__':

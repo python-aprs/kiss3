@@ -8,7 +8,7 @@ import socket
 
 import serial
 
-import kiss
+from . import constants, util
 
 __author__ = 'Greg Albrecht W2GMD <oss@undef.net>'  # NOQA pylint: disable=R0801
 __copyright__ = 'Copyright 2017 Greg Albrecht and Contributors'  # NOQA pylint: disable=R0801
@@ -21,10 +21,10 @@ class KISS(object):
 
     _logger = logging.getLogger(__name__)  # pylint: disable=R0801
     if not _logger.handlers:  # pylint: disable=R0801
-        _logger.setLevel(kiss.LOG_LEVEL)  # pylint: disable=R0801
+        _logger.setLevel(constants.LOG_LEVEL)  # pylint: disable=R0801
         _console_handler = logging.StreamHandler()  # pylint: disable=R0801
-        _console_handler.setLevel(kiss.LOG_LEVEL)  # pylint: disable=R0801
-        _console_handler.setFormatter(kiss.LOG_FORMAT)  # pylint: disable=R0801
+        _console_handler.setLevel(constants.LOG_LEVEL)  # pylint: disable=R0801
+        _console_handler.setFormatter(constants.LOG_FORMAT)  # pylint: disable=R0801
         _logger.addHandler(_console_handler)  # pylint: disable=R0801
         _logger.propagate = False  # pylint: disable=R0801
 
@@ -45,7 +45,7 @@ class KISS(object):
         """
         Helper method to call when reading from KISS interface.
         """
-        read_bytes = read_bytes or kiss.READ_BYTES
+        read_bytes = read_bytes or constants.READ_BYTES
 
     def _write_handler(self, frame=None):  # pylint: disable=R0201
         """
@@ -82,10 +82,10 @@ class KISS(object):
 
         return self.interface.write(
             b''.join([
-                kiss.FEND,
+                constants.FEND,
                 bytes(getattr(kiss, name.upper())),
-                kiss.escape_special_codes(value),
-                kiss.FEND
+                util.escape_special_codes(value),
+                constants.FEND
             ])
         )
 
@@ -115,7 +115,7 @@ class KISS(object):
 
                 frames = []
 
-                split_data = read_data.split(kiss.FEND)
+                split_data = read_data.split(constants.FEND)
                 fends = len(split_data)
 
                 self._logger.debug(
@@ -123,7 +123,7 @@ class KISS(object):
 
                 # Handle NMEAPASS on T3-Micro
                 if len(read_data) >= 900:
-                    if kiss.NMEA_HEADER in read_data and '\r\n' in read_data:
+                    if constants.NMEA_HEADER in read_data and '\r\n' in read_data:
                         if callback:
                             callback(read_data)
                         elif not readmode:
@@ -162,15 +162,15 @@ class KISS(object):
                         read_buffer = bytearray(split_data[fends - 1])
 
                 # Fixup T3-Micro NMEA Sentences
-                frames = list(map(kiss.strip_nmea, frames))
+                frames = list(map(util.strip_nmea, frames))
                 # Remove None frames.
                 frames = [_f for _f in frames if _f]
 
                 # Maybe.
-                frames = list(map(kiss.recover_special_codes, frames))
+                frames = list(map(util.recover_special_codes, frames))
 
                 if self.strip_df_start:
-                    frames = list(map(kiss.strip_df_start, frames))
+                    frames = list(map(util.strip_df_start, frames))
 
                 if readmode:
                     for frame in frames:
@@ -186,15 +186,15 @@ class KISS(object):
         """
         self._logger.debug('frame(%s)="%s"', len(frame), frame)
 
-        frame_escaped = kiss.escape_special_codes(frame)
+        frame_escaped = util.escape_special_codes(frame)
         self._logger.debug(
             'frame_escaped(%s)="%s"', len(frame_escaped), frame_escaped)
 
         frame_kiss = b''.join([
-            kiss.FEND,
-            kiss.DATA_FRAME,
+            constants.FEND,
+            constants.DATA_FRAME,
             frame_escaped,
-            kiss.FEND
+            constants.FEND
         ])
         self._logger.debug(
             'frame_kiss(%s)="%s"', len(frame_kiss), frame_kiss)
@@ -212,7 +212,7 @@ class TCPKISS(KISS):
         super(TCPKISS, self).__init__(strip_df_start)
 
     def _read_handler(self, read_bytes=None):
-        read_bytes = read_bytes or kiss.READ_BYTES
+        read_bytes = read_bytes or constants.READ_BYTES
         read_data = self.interface.recv(read_bytes)
         self._logger.debug('len(read_data)=%s', len(read_data))
         return read_data
@@ -244,7 +244,7 @@ class SerialKISS(KISS):
         super(SerialKISS, self).__init__(strip_df_start)
 
     def _read_handler(self, read_bytes=None):
-        read_bytes = read_bytes or kiss.READ_BYTES
+        read_bytes = read_bytes or constants.READ_BYTES
         read_data = self.interface.read(read_bytes)
         if len(read_data) > 0:
             self._logger.debug('len(read_data)=%s', len(read_data))
@@ -274,15 +274,15 @@ class SerialKISS(KISS):
         Xastir.
         """
         return self._write_defaults(
-            **kiss.DEFAULT_KISS_CONFIG_VALUES)
+            **constants.DEFAULT_KISS_CONFIG_VALUES)
 
     def kiss_on(self):
         """Turns KISS ON."""
-        self.interface.write(kiss.KISS_ON)
+        self.interface.write(constants.KISS_ON)
 
     def kiss_off(self):
         """Turns KISS OFF."""
-        self.interface.write(kiss.KISS_OFF)
+        self.interface.write(constants.KISS_OFF)
 
     def stop(self):
         try:
@@ -303,7 +303,7 @@ class SerialKISS(KISS):
         """
         self._logger.debug('kwargs=%s', kwargs)
         self.interface = serial.Serial(self.port, self.speed)
-        self.interface.timeout = kiss.SERIAL_TIMEOUT
+        self.interface.timeout = constants.SERIAL_TIMEOUT
         self._write_handler = self.interface.write
         self._write_defaults(**kwargs)
 
@@ -312,5 +312,5 @@ class SerialKISS(KISS):
         Initializes the KISS device without writing configuration.
         """
         self.interface = serial.Serial(self.port, self.speed)
-        self.interface.timeout = kiss.SERIAL_TIMEOUT
+        self.interface.timeout = constants.SERIAL_TIMEOUT
         self._write_handler = self.interface.write

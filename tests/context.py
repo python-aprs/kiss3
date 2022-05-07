@@ -8,8 +8,8 @@ import sys
 
 sys.path.insert(0, os.path.abspath('..'))
 
-import kiss  # NOQA pylint: disable=W0611,C0413
-import kiss.constants  # NOQA pylint: disable=W0611,C0413
+import kiss3  # NOQA pylint: disable=W0611,C0413
+import kiss3.constants  # NOQA pylint: disable=W0611,C0413
 
 from . import kiss_test_classes  # NOQA pylint: disable=W0611
 

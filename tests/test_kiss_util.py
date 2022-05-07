@@ -5,7 +5,7 @@
 
 import unittest
 
-from .context import kiss  # pylint: disable=R0801
+from .context import kiss3  # pylint: disable=R0801
 from .context import kiss_test_classes  # pylint: disable=R0801
 
 from . import constants  # pylint: disable=R0801
@@ -30,25 +30,25 @@ class KISSUtilTestCase(kiss_test_classes.KISSTestClass):  # NOQA pylint: disable
 
     def test_escape_special_codes_fend(self):
         """
-        Tests `kiss.escape_special_codes` util function.
+        Tests `kiss3.escape_special_codes` util function.
         """
-        fend = kiss.escape_special_codes(kiss.FEND)
+        fend = kiss3.escape_special_codes(kiss3.FEND)
         self._logger.debug('fend=%s', fend)
-        self.assertEqual(fend, kiss.FESC_TFEND)
+        self.assertEqual(fend, kiss3.FESC_TFEND)
 
     def test_escape_special_codes_fesc(self):
         """
-        Tests `kiss.escape_special_codes` util function.
+        Tests `kiss3.escape_special_codes` util function.
         """
-        fesc = kiss.escape_special_codes(kiss.FESC)
+        fesc = kiss3.escape_special_codes(kiss3.FESC)
         self._logger.debug('fesc=%s', fesc)
-        self.assertEqual(fesc, kiss.FESC_TFESC)
+        self.assertEqual(fesc, kiss3.FESC_TFESC)
 
     def test_extract_ui(self):
         """
-        Tests `kiss.extract_ui` util function.
+        Tests `kiss3.extract_ui` util function.
         """
-        frame_ui = kiss.extract_ui(self.test_frame)
+        frame_ui = kiss3.extract_ui(self.test_frame)
         self._logger.debug('frame_ui=%s', frame_ui)
         self.assertEqual('APRX240W2GMD 6WIDE1 1', frame_ui)
 

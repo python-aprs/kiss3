@@ -1,0 +1,39 @@
+[build-system]
+requires = [
+    "setuptools",
+    "setuptools_scm[toml]",
+    "wheel",
+]
+build-backend = "setuptools.build_meta"
+
+[dependencies]
+pyserial = "^3.4.0"
+
+[dev-dependencies]
+black = { version = "^22.3.0", python = "^3.6" }
+pytest = "^7"
+pytest-cov = "^3"
+dummyserial = "^1.0.0"
+
+[project]
+name = "kiss3"
+description = "A pure-Python implementation of serial KISS and KISS-over-TCP protocols for communicating with TNC devices"
+authors = [
+    {name = "Masen Furer KF7HVM", email = "kf7hvm@0x26.net"},
+    {name = "Greg Albrecht W2GMD", email = "oss@undef.net"}
+]
+readme = "README.rst"
+license = {file = "LICENSE"}
+classifiers = [
+    "License :: OSI Approved :: Apache Software License",
+    "Topic :: Communications :: Ham Radio",
+    "Programming Language :: Python",
+    "License :: OSI Approved :: Apache Software License"
+]
+keywords=[
+    'Ham Radio', 'APRS', 'KISS'
+]
+dynamic = ["version"]
+
+[project.urls]
+Home = "https://github.com/python-aprs/kiss3"

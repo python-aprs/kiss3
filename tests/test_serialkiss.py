@@ -6,9 +6,11 @@
 import unittest
 
 import aprs
-import dummyserial
+import serial.serialutil
+serial.serialutil.portNotOpenError = serial.serialutil.PortNotOpenError
+import dummyserial  # dummyserial wants to import the old name, otherwise it works
 
-from .context import kiss
+from .context import kiss3
 from .context import kiss_test_classes  # pylint: disable=R0801
 
 from . import constants
@@ -39,7 +41,7 @@ class SerialKISSTestCase(kiss_test_classes.KISSTestClass):
         self.test_frames.close()
 
     def test_write(self):
-        ks = kiss.SerialKISS(port=self.random_serial_port, speed='9600')
+        ks = kiss3.SerialKISS(port=self.random_serial_port, speed='9600')
         ks.interface = dummyserial.Serial(port=self.random_serial_port)
         ks._write_handler = ks.interface.write
 
@@ -78,18 +80,18 @@ class SerialKISSTestCase(kiss_test_classes.KISSTestClass):
         frame_encoded = frame.encode_kiss()
         self._logger.debug('frame_encoded="%s"', frame_encoded)
 
-        frame_escaped = kiss.escape_special_codes(frame_encoded)
+        frame_escaped = kiss3.escape_special_codes(frame_encoded)
         self._logger.debug('frame_escaped="%s"', frame_escaped)
 
         frame_kiss = ''.join([
-            kiss.FEND,
-            kiss.DATA_FRAME,
+            kiss3.FEND,
+            kiss3.DATA_FRAME,
             frame_escaped,
-            kiss.FEND
+            kiss3.FEND
         ])
         self._logger.debug('frame_kiss="%s"', frame_kiss)
 
-        ks = kiss.SerialKISS(
+        ks = kiss3.SerialKISS(
             port=self.random_serial_port, speed=self.random_baudrate)
 
         ks.interface = dummyserial.Serial(
@@ -105,7 +107,7 @@ class SerialKISSTestCase(kiss_test_classes.KISSTestClass):
 
     def test_config_xastir(self):
         """Tests writing Xastir config to KISS TNC."""
-        ks = kiss.SerialKISS(
+        ks = kiss3.SerialKISS(
             port=self.random_serial_port, speed=self.random_baudrate)
 
         ks.interface = dummyserial.Serial(
