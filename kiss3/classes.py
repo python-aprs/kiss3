@@ -125,7 +125,7 @@ class KISS(abc.ABC):
             if self.strip_df_start:
                 frame = util.strip_df_start(frame)
             frames.append(frame)
-            if callback:
+            if callback is not None:
                 callback(frame)
             read_buffer.clear()
 
