@@ -15,7 +15,7 @@ NUMBERS = ''.join([str(x) for x in range(0, 10)])
 POSITIVE_NUMBERS = NUMBERS[1:]
 ALPHANUM = ''.join([ALPHABET, NUMBERS])
 
-TEST_FRAMES = 'tests/test_frames.log'
+TEST_FRAMES = 'test_frames.log'
 
 TEST_FRAME = (
     '82a0a4b0646860ae648e9a88406cae92888a62406303f021333734352e3735'

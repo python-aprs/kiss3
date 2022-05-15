@@ -1,10 +1,25 @@
 import io
 from pathlib import Path
+import random
 from unittest import mock
 
 import pytest
 
+import kiss3
 from kiss3 import KISS, constants, SerialKISS, TCPKISS
+from kiss3.ax25 import Address, Frame
+from kiss3.util import getLogger
+from .constants import ALPHANUM, TEST_FRAMES
+
+
+__author__ = "Masen Furer KF7HVM <kf7hvm@0x26.net>"  # NOQA pylint: disable=R0801
+__copyright__ = (
+    "Copyright 2022 Masen Furer and Contributors"  # NOQA pylint: disable=R0801
+)
+__license__ = "Apache License, Version 2.0"  # NOQA pylint: disable=R0801
+
+
+logger = getLogger(__name__)
 
 
 class MockKISS(KISS):
@@ -25,6 +40,18 @@ class MockKISS(KISS):
 
     def stop(self):
         return
+
+
+@pytest.fixture
+def dummy_interface():
+    return mock.Mock()
+
+
+@pytest.fixture
+def dummy_serialkiss(dummy_interface):
+    ks = kiss3.SerialKISS(port=random_alphanum(), speed="9600", strip_df_start=True)
+    ks.interface = dummy_interface
+    return ks
 
 
 @pytest.fixture(params=[MockKISS, TCPKISS, SerialKISS])
@@ -56,9 +83,38 @@ def kiss_instance(request):
 
 @pytest.fixture
 def sample_frames():
-    return (Path(__file__).parent / "test_frames.log").read_bytes().split(b"\n")
+    return (Path(__file__).parent / TEST_FRAMES).read_bytes().split(b"\n")
 
 
 @pytest.fixture(params=[0, 1])
 def sample_frame(request, sample_frames):
     return sample_frames[request.param]
+
+
+@pytest.fixture
+def payload_frame():
+    frame = Frame(
+        destination=Address.from_text(random_alphanum(6)),
+        source=Address.from_text(random_alphanum(6), a7_hldc=True),
+        path=[
+            Address.from_text(random_alphanum(6)),
+            Address.from_text(random_alphanum(6), a7_hldc=True),
+        ],
+        info=" ".join(
+            [random_alphanum(), "this is the data for the frame", random_alphanum()]
+        ),
+    )
+    logger.debug('frame="%s"', frame)
+    return frame
+
+
+def random_alphanum(length=8, alphabet=ALPHANUM):
+    """
+    Generates a random string for test cases.
+
+    :param length: Length of string to generate.
+    :param alphabet: Alphabet to use to create string.
+    :type length: int
+    :type alphabet: str
+    """
+    return "".join(random.choice(alphabet) for _ in range(length))

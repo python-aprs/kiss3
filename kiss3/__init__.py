@@ -15,7 +15,7 @@ Python KISS Module.
 
 """
 
-from .constants import (
+from .constants import (  # noqa: F401
     LOG_FORMAT,
     LOG_LEVEL,
     SERIAL_TIMEOUT,
@@ -45,12 +45,12 @@ from .constants import (
     KISS_ON,
     KISS_OFF,
     NMEA_HEADER,
-    UI_PROTOCOL_ID,
+    NO_PROTOCOL_ID,
 )
 
 from .exceptions import SocketClosetError  # NOQA
 
-from .util import (
+from .util import (  # noqa: F401
     escape_special_codes,
     recover_special_codes,
     extract_ui,  # NOQA

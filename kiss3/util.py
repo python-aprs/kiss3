@@ -65,7 +65,7 @@ def extract_ui(frame):
     """
     start_ui = frame.split(b"".join([constants.FEND, constants.DATA_FRAME]))
     end_ui = start_ui[0].split(
-        b"".join([constants.SLOT_TIME, constants.UI_PROTOCOL_ID]),
+        b"".join([constants.SLOT_TIME, constants.NO_PROTOCOL_ID]),
     )
     return "".join([chr(x >> 1) for x in end_ui[0]])
 
@@ -105,3 +105,24 @@ def getLogger(name):
         console_handler.setFormatter(constants.LOG_FORMAT)
         logger.addHandler(console_handler)
     return logger
+
+
+def valid_length(at_least, at_most=None, sequence_validator=None):
+    def _validator(instance, attribute, value):
+        if sequence_validator:
+            sequence_validator(instance, attribute, value)
+        len_value = len(value)
+        if len_value < at_least:
+            raise ValueError(
+                "{} must be at least {} (actual={})".format(
+                    attribute.name, at_least, len_value
+                )
+            )
+        if at_most is not None and len_value > at_most:
+            raise ValueError(
+                "{} must be at most {} (actual={})".format(
+                    attribute.name, at_most, len_value
+                )
+            )
+
+    return _validator

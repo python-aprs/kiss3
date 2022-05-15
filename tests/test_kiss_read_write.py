@@ -1,8 +1,19 @@
 import pytest
 
+import kiss3
 from kiss3 import constants
+from kiss3.ax25 import Frame
+from kiss3.util import getLogger
 
 from .conftest import MockKISS
+
+
+__author__ = 'Greg Albrecht W2GMD <oss@undef.net>'  # NOQA pylint: disable=R0801
+__copyright__ = 'Copyright 2017 Greg Albrecht and Contributors'  # NOQA pylint: disable=R0801
+__license__ = 'Apache License, Version 2.0'  # NOQA pylint: disable=R0801
+
+
+logger = getLogger(__name__)
 
 
 @pytest.mark.parametrize(
@@ -109,3 +120,51 @@ def test_write_setting(name, value, exp_data):
     k = MockKISS()
     k.write_setting(name, value)
     assert k.buffer.getvalue() == constants.FEND + exp_data + constants.FEND
+
+
+def test_config_xastir(dummy_serialkiss, dummy_interface):
+    """Tests writing Xastir config to KISS TNC."""
+    dummy_serialkiss.config_xastir()
+    print(dummy_interface.mock_calls)
+
+
+@pytest.fixture
+def payload_frame_kiss(payload_frame):
+    frame_encoded = payload_frame.encode_ax25()
+    logger.debug('frame_encoded="%s"', frame_encoded)
+
+    frame_escaped = kiss3.escape_special_codes(frame_encoded)
+    logger.debug('frame_escaped="%s"', frame_escaped)
+
+    frame_kiss = b''.join([
+        kiss3.FEND,
+        kiss3.DATA_FRAME,
+        frame_escaped,
+        kiss3.FEND
+    ])
+    logger.debug('frame_kiss="%s"', frame_kiss)
+    return frame_kiss
+
+
+def test_write_ax25(kiss_instance, payload_frame, payload_frame_kiss):
+    frame_encoded = payload_frame.encode_ax25()
+    logger.debug('frame_encoded="%s"', frame_encoded)
+
+    ks = kiss_instance(strip_df_start=True)
+    ks.write(frame_encoded)
+    assert ks.buffer.getvalue() == payload_frame_kiss
+
+
+@pytest.mark.parametrize("min_frames", [1, 2, 10])
+def test_read_ax25(kiss_instance, payload_frame_kiss, payload_frame, min_frames):
+    """Test decode of ax25 from kiss."""
+    ks = kiss_instance(payload_frame_kiss * min_frames, strip_df_start=True)
+    frames = ks.read()
+    assert len(frames) >= min_frames
+    for frame in frames:
+        decoded_frame = Frame.from_ax25(frame)
+        assert len(decoded_frame) == 1
+        assert decoded_frame[0] == payload_frame
+    ax25_frames = Frame.from_ax25(b"".join(frames))
+    for decoded_frame in ax25_frames:
+        assert decoded_frame == payload_frame
