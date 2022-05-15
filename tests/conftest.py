@@ -71,11 +71,17 @@ def kiss_instance(request):
         return make_tcp
     if request.param is SerialKISS:
 
+        class BytesIOSerial(io.BytesIO):
+            @property
+            def in_waiting(self):
+                return int(self.readable())
+
+            def isOpen(self):
+                return self.closed
+
         def make_serial(data_buffer=b"", **kwargs):
             sk = SerialKISS("/dev/foo", "9600", **kwargs)
-            sk.buffer = sk.interface = io.BytesIO(data_buffer)
-            sk.interface.in_waiting = 0
-            sk.interface.isOpen = lambda: not sk.interface.closed
+            sk.buffer = sk.interface = BytesIOSerial(data_buffer)
             return sk
 
         return make_serial
