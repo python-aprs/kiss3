@@ -1,19 +1,10 @@
 [build-system]
 requires = [
-    "setuptools",
+    "setuptools>=61",
     "setuptools_scm[toml]",
     "wheel",
 ]
 build-backend = "setuptools.build_meta"
-
-[dependencies]
-pyserial = "^3.4.0"
-
-[dev-dependencies]
-black = { version = "^22.3.0", python = "^3.6" }
-pytest = "^7"
-pytest-cov = "^3"
-dummyserial = "^1.0.0"
 
 [project]
 name = "kiss3"
@@ -21,6 +12,11 @@ description = "A pure-Python implementation of serial KISS and KISS-over-TCP pro
 authors = [
     {name = "Masen Furer KF7HVM", email = "kf7hvm@0x26.net"},
     {name = "Greg Albrecht W2GMD", email = "oss@undef.net"}
+]
+dependencies = [
+    "pyserial > 3.4.0",
+    "bitarray > 2.5.0",
+    "attrs > 20"
 ]
 readme = "README.rst"
 license = {file = "LICENSE"}
