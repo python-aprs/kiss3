@@ -21,6 +21,7 @@ from .ax25 import (  # noqa: F401
     Frame,
     FrameType,
 )
+from .classes import KISS, SerialKISS, TCPKISS  # noqa: F401
 from .constants import (  # noqa: F401
     LOG_FORMAT,
     LOG_LEVEL,
