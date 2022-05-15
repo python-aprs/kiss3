@@ -95,7 +95,7 @@ def sample_frame(request, sample_frames):
 def payload_frame():
     frame = Frame(
         destination=Address.from_text(random_alphanum(6)),
-        source=Address.from_text(random_alphanum(6), a7_hldc=True),
+        source=Address.from_text(random_alphanum(6)),
         path=[
             Address.from_text(random_alphanum(6)),
             Address.from_text(random_alphanum(6), a7_hldc=True),

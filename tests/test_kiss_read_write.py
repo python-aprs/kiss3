@@ -162,6 +162,3 @@ def test_read_ax25(kiss_instance, payload_frame_kiss, payload_frame, min_frames)
         decoded_frame = Frame.from_ax25(frame)
         assert len(decoded_frame) == 1
         assert decoded_frame[0] == payload_frame
-    ax25_frames = Frame.from_ax25(b"".join(frames))
-    for decoded_frame in ax25_frames:
-        assert decoded_frame == payload_frame
