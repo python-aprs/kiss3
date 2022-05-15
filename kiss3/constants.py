@@ -86,4 +86,4 @@ NMEA_HEADER = b"".join([FEND, b"\xF0", b"$"])
 # AX.25 Protocol ID — This field is set to 0xf0 (no layer 3 protocol).
 NO_PROTOCOL_ID = b"\xF0"
 # AX.25 Control Field — This field is set to 0x03 (UI-frame).
-UI_CONTROL_FIELD = b'\x03'
+UI_CONTROL_FIELD = b"\x03"
