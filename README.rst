@@ -1,14 +1,17 @@
 kiss3 - Python KISS Module
 *************************
 
-kiss3 is a Python Module that implementations the `KISS Protocol <https://en.wikipedia.org/wiki/KISS_(TNC)>`_ for
-communicating with KISS-enabled devices (such as Serial or TCP TNCs).
+kiss3 is a Python Module that implements the
+`KISS Protocol <https://en.wikipedia.org/wiki/KISS_(TNC)>`_ for
+communicating with KISS-enabled devices (such as Serial or TCP TNCs)
+and provides support for encoding and decoding AX.25 frames.
 
 Versions
 ========
 
 - 6.5.x branch will be the last version of this Module that supports Python 2.7.x
 - 7.x.x branch and-on will be Python 3.x ONLY.
+- 8.x branch from ``python-aprs`` supports python 3.6+
 
 Installation
 ============
@@ -33,9 +36,9 @@ See also: examples/ directory.
 
 Testing
 =======
-Run nosetests from a Makefile target::
+Run tox::
 
-    make test
+    tox
 
 
 See Also
