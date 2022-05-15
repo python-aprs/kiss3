@@ -2,7 +2,7 @@
 """AX.25 encode/decode"""
 import enum
 import re
-from typing import List, Optional, Sequence
+from typing import List, Optional, Sequence, Union
 
 import attr.validators
 from attrs import define, field
@@ -37,9 +37,9 @@ class Address:
     """AX.25-encoded callsign."""
 
     callsign: bytes = field(converter=lambda c: c.upper(), validator=valid_callsign)
-    ssid: int = field(default=0)
-    digi: bool = field(default=False)
-    a7_hldc: bool = field(default=False)
+    ssid: int = field(default=0, converter=int)
+    digi: bool = field(default=False, converter=bool)
+    a7_hldc: bool = field(default=False, converter=bool)
 
     _logger = util.getLogger(__name__)  # pylint: disable=R0801
 
@@ -204,12 +204,14 @@ class Frame:
         converter=attr.converters.optional(bytes_from_int),
     )
     info: bytes = field(default=b"", converter=bytes_or_encode_utf8)
-    fcs: Optional[bytes] = field(
+    fcs: Optional[Union[bytes, bool]] = field(
         default=None,
         validator=attr.validators.optional(
-            util.valid_length(2, 2, validators.instance_of(bytes)),
+            util.instance_of_or(
+                bool, util.valid_length(2, 2, validators.instance_of(bytes))
+            ),
         ),
-        converter=attr.converters.optional(bytes),
+        converter=util.optional_bool_or_bytes,
     )
 
     _logger = util.getLogger(__name__)
@@ -218,33 +220,31 @@ class Frame:
     def from_ax25(cls, ax25_bytes: bytes) -> Sequence["Frame"]:
         packet_start = 0
         frames: List[Frame] = []
-        while (packet_start + 1) < len(ax25_bytes):
+        while 0 < (packet_start + 1) < len(ax25_bytes):
             if ax25_bytes[packet_start] != AX25_FLAG:
-                packet_start += 1
-                cls._logger.info(
+                cls._logger.debug(
                     "AX.25 frame did not start with flag {}, got {} "
-                    "instead (discarding)".format(
+                    "instead (treating it as the start)".format(
                         bin(AX25_FLAG),
                         bin(ax25_bytes[packet_start]),
                     )
                 )
-                continue
             header_start = packet_start
             while ax25_bytes[header_start] == AX25_FLAG:
                 # consume flag bytes until data is reached
                 header_start += 1
             destination = Address.from_ax25(ax25_bytes[header_start : header_start + 7])
-            source = Address.from_ax25(ax25_bytes[header_start + 7 : header_start + 14])
+            source = last_address = Address.from_ax25(
+                ax25_bytes[header_start + 7 : header_start + 14]
+            )
             path = []
             path_start = header_start + 14
-            if source.a7_hldc:
-                last_address = Address(callsign=b"X")
-                while not last_address.a7_hldc:
-                    last_address = Address.from_ax25(
-                        ax25_bytes[path_start : path_start + 7]
-                    )
-                    path.append(last_address)
-                    path_start += 7
+            while not last_address.a7_hldc:
+                last_address = Address.from_ax25(
+                    ax25_bytes[path_start : path_start + 7]
+                )
+                path.append(last_address)
+                path_start += 7
             info_start = control_end = path_start + cls.CONTROL_SIZE
             control = Control(ax25_bytes[path_start:control_end])
             if control.ftype in (FrameType.I, FrameType.U_UI):
@@ -255,13 +255,19 @@ class Frame:
             # find the end of the packet
             end_flag_at = packet_start = ax25_bytes.find(AX25_FLAG, info_start)
             if end_flag_at < 0:
-                raise ValueError(
-                    "Frame does not end with AX.25 flag (0x{:x}): {!r}".format(
-                        AX25_FLAG, ax25_bytes[info_start:]
-                    ),
+                # assume missing Flag means no FCS
+                fcs = None
+                info = ax25_bytes[info_start:]
+                cls._logger.debug(
+                    "AX.25 frame did not end with flag {}, got {} "
+                    "instead (treating it as the end)".format(
+                        bin(AX25_FLAG),
+                        bin(info[-1]),
+                    )
                 )
-            info = ax25_bytes[info_start : end_flag_at - 2]
-            fcs = ax25_bytes[end_flag_at - 2 : end_flag_at] or None
+            else:
+                fcs = ax25_bytes[end_flag_at - 2 : end_flag_at] or None
+                info = ax25_bytes[info_start : end_flag_at - 2]
             frames.append(
                 cls(
                     destination=destination,
@@ -299,17 +305,22 @@ class Frame:
         Encodes an APRS Frame as AX.25.
         """
         encoded_frame = [
-            AX25_FLAG_B,
             self.destination.encode_ax25(),
             self.source.encode_ax25(),
-            b"".join(p.encode_ax25() for p in self.path),
+            b"".join(p.encode_ax25() for p in self.path[:-1]),
+            attr.evolve(self.path[-1], a7_hldc=True).encode_ax25()
+            if self.path
+            else b"",
             self.control.v,
         ]
         if self.control.ftype in (FrameType.I, FrameType.U_UI):
             encoded_frame.append(self.pid)
         encoded_frame.append(self.info)
         checkable_bytes = b"".join(encoded_frame)
-        if self.fcs is None:
+        if not self.fcs:
+            # KISS-over-TCP can't make use of an fcs here
+            return bytearray(checkable_bytes)
+        if self.fcs is True:
             # unthaw to set the fcs value once we know it
             object.__setattr__(self, "fcs", FCS.from_bytes(checkable_bytes).digest())
-        return bytearray(b"".join([checkable_bytes, self.fcs, AX25_FLAG_B]))
+        return bytearray(b"".join([checkable_bytes, self.fcs]))

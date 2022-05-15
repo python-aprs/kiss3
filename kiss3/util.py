@@ -126,3 +126,19 @@ def valid_length(at_least, at_most=None, sequence_validator=None):
             )
 
     return _validator
+
+
+def instance_of_or(types, other_validator):
+    """check if the value is a bool or satisfies `other_validator`."""
+
+    def _validator(instance, attribute, value):
+        if not isinstance(value, types):
+            other_validator(instance, attribute, value)
+
+    return _validator
+
+
+def optional_bool_or_bytes(v):
+    if v is not None and not isinstance(v, bool):
+        return bytes(v)
+    return v

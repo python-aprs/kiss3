@@ -205,7 +205,7 @@ class TCPKISS(KISS):
         Initializes the KISS device and commits configuration.
         """
         self.interface = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self._logger.debug("Conntecting to %s", self.address)
+        self._logger.debug("Connecting to %s", self.address)
         self.interface.connect(self.address)
         self._logger.info("Connected to %s", self.address)
 

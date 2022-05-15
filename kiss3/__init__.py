@@ -15,6 +15,12 @@ Python KISS Module.
 
 """
 
+from .ax25 import (  # noqa: F401
+    Address,
+    Control,
+    Frame,
+    FrameType,
+)
 from .constants import (  # noqa: F401
     LOG_FORMAT,
     LOG_LEVEL,
