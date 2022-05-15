@@ -1,25 +1,29 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 """
-Reads & Prints KISS frames from a Serial console.
-
-For use with programs like Dire Wolf.
+Send KISS frames to a Serial TNC.
 """
+import os
 
-import aprs
-import kiss
+import kiss3
+
+
+MYCALL = os.environ.get("MYCALL", "N0CALL")
+KISS_SERIAL = os.environ.get("KISS_SERIAL", "/dev/cu.Repleo-PL2303-00303114")
+KISS_SPEED = os.environ.get("KISS_SPEED", "9600")
 
 
 def main():
-    frame = aprs.Frame()
-    frame.source = aprs.Callsign('W2GMD-14')
-    frame.destination = aprs.Callsign('PYKISS')
-    frame.path = [aprs.Callsign('WIDE1-1')]
-    frame.text = '>Hello World!'
+    frame = kiss3.Frame(
+        destination=kiss3.Address.from_text("PYKISS"),
+        source=kiss3.Address.from_text(MYCALL),
+        path=[kiss3.Address.from_text("WIDE1-1")],
+        info=">Hello World!",
+    )
 
-    ki = kiss.SerialKISS(port='/dev/cu.AP510-DevB', speed='9600')
+    ki = kiss3.SerialKISS(port=KISS_SERIAL, speed=KISS_SPEED)
     ki.start()
-    ki.write(frame.encode_kiss())
+    ki.write(frame.encode_ax25())
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
