@@ -20,10 +20,10 @@ __license__ = "Apache License, Version 2.0"  # NOQA pylint: disable=R0801
     ),
 )
 def test_address_from_text(text, exp_address):
-    a = Address.from_text(text)
+    a = Address.from_str(text)
     assert a == exp_address
     assert str(a) == text
-    print(repr(a.encode_ax25()))
+    print(repr(bytes(a)))
 
 
 @pytest.mark.parametrize(
@@ -36,6 +36,6 @@ def test_address_from_text(text, exp_address):
     ),
 )
 def test_address_from_ax25(ax25_bytes, exp_address):
-    a = Address.from_ax25(ax25_bytes)
+    a = Address.from_bytes(ax25_bytes)
     assert a == exp_address
-    assert Address.from_text(str(a)) == exp_address
+    assert Address.from_str(str(a)) == exp_address

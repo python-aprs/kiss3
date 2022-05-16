@@ -132,7 +132,7 @@ def test_config_xastir(dummy_serialkiss, dummy_interface):
 
 @pytest.fixture
 def payload_frame_kiss(payload_frame):
-    frame_encoded = payload_frame.encode_ax25()
+    frame_encoded = bytes(payload_frame)
     logger.debug('frame_encoded="%s"', frame_encoded)
 
     frame_escaped = kiss3.escape_special_codes(frame_encoded)
@@ -144,7 +144,7 @@ def payload_frame_kiss(payload_frame):
 
 
 def test_write_ax25(kiss_instance, payload_frame, payload_frame_kiss):
-    frame_encoded = payload_frame.encode_ax25()
+    frame_encoded = bytes(payload_frame)
     logger.debug('frame_encoded="%s"', frame_encoded)
 
     ks = kiss_instance(strip_df_start=True)
