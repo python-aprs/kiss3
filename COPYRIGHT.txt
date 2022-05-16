@@ -1,1 +1,2 @@
 Copyright 2017 Greg Albrecht and Contributors
+Copyright 2022 Masen Furer and Contributors
