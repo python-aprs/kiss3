@@ -221,15 +221,12 @@ class SerialKISS(KISS):
         super(SerialKISS, self).__init__(strip_df_start)
 
     def _read_handler(self, read_bytes: Optional[int] = None) -> bytes:
-        read_bytes = read_bytes or constants.READ_BYTES
-        read_data = self.interface.read(read_bytes)
+        read_data = b""
+        while self.interface.isOpen() and not read_data:
+            read_bytes = read_bytes or self.interface.in_waiting or constants.READ_BYTES
+            read_data = self.interface.read(read_bytes)
         if len(read_data) > 0:
             self._logger.debug("len(read_data)=%s", len(read_data))
-
-        waiting_data = self.interface.in_waiting
-        if waiting_data:
-            self._logger.debug("waiting_data=%s", waiting_data)
-            read_data += self.interface.read(waiting_data)
         return read_data
 
     def _write_handler(self, frame: Optional[bytes] = None) -> int:

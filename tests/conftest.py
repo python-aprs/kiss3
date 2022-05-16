@@ -77,7 +77,7 @@ def kiss_instance(request):
                 return int(self.readable())
 
             def isOpen(self):
-                return self.closed
+                return self.tell() < len(self.getbuffer())
 
         def make_serial(data_buffer=b"", **kwargs):
             sk = SerialKISS("/dev/foo", "9600", **kwargs)
