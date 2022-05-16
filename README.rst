@@ -1,5 +1,5 @@
 kiss3 - Python KISS Module
-*************************
+**************************
 
 kiss3 is a Python Module that implements the
 `KISS Protocol <https://en.wikipedia.org/wiki/KISS_(TNC)>`_ for
