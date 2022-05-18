@@ -2,7 +2,19 @@
 import asyncio
 import enum
 import functools
-from typing import Callable, cast, Generic, Iterable, Optional, TypeVar, Union
+from typing import (
+    Any,
+    Awaitable,
+    Callable,
+    cast,
+    Dict,
+    Generic,
+    Iterable,
+    Optional,
+    Tuple,
+    TypeVar,
+    Union,
+)
 
 from attrs import define, field
 import serial_asyncio
@@ -137,7 +149,10 @@ class KISSProtocol(asyncio.Protocol):
     transport: Optional[asyncio.Transport] = field(default=None)
     decoder: KISSDecode = field(factory=AX25KISSDecode)
     frames: asyncio.Queue = field(factory=asyncio.Queue, init=False)
-    connection_future: asyncio.Future = field(factory=asyncio.Future, init=False)
+    connection_future: asyncio.Future[asyncio.Transport] = field(
+        factory=asyncio.Future,
+        init=False,
+    )
 
     def connection_made(self, transport: asyncio.Transport) -> None:
         """
@@ -195,7 +210,7 @@ class KISSProtocol(asyncio.Protocol):
             command=name,
         )
 
-    def write_settings(self, **settings):
+    def write_settings(self, settings: Dict[Command, bytes]):
         """Write a dictionary of settings."""
         for name, value in settings.items():
             self.write_setting(name, value)
@@ -209,7 +224,11 @@ class KISSProtocol(asyncio.Protocol):
         self.transport.write(KISS_OFF)
 
 
-def _handle_kwargs(protocol_kwargs, create_connection_kwargs, **kwargs):
+def _handle_kwargs(
+    protocol_kwargs: Dict[str, Any],
+    create_connection_kwargs: Dict[str, Any],
+    **kwargs: Any
+) -> Dict[str, Any]:
     """Handle async connection kwarg combination to avoid duplication."""
     if create_connection_kwargs is None:
         create_connection_kwargs = {}
@@ -221,23 +240,28 @@ def _handle_kwargs(protocol_kwargs, create_connection_kwargs, **kwargs):
     return create_connection_kwargs
 
 
-async def _generic_create_connection(f, args, kwargs, kiss_settings):
+async def _generic_create_connection(
+    f: Callable[[...], Awaitable[Tuple[asyncio.Transport, KISSProtocol]]],
+    args: Iterable[Any],
+    kwargs: Dict[str, Any],
+    kiss_settings: Dict[Command, bytes],
+) -> Tuple[asyncio.Transport, KISSProtocol]:
     """Create a generic KISS connection and apply settings."""
     transport, protocol = await f(*args, **kwargs)
     if kiss_settings:
-        await protocol.connection_future()
-        protocol.write_settings(kiss_settings)  # type: ignore
+        await protocol.connection_future
+        protocol.write_settings(kiss_settings)
     return transport, protocol
 
 
 async def create_tcp_connection(
     host,
     port,
-    protocol_kwargs=None,
-    loop=None,
-    create_connection_kwargs=None,
-    kiss_settings=None,
-):
+    protocol_kwargs: Optional[Dict[str, Any]] = None,
+    loop: Optional[asyncio.BaseEventLoop] = None,
+    create_connection_kwargs: Optional[Dict[str, Any]] = None,
+    kiss_settings: Optional[Dict[Command, bytes]] = None,
+) -> Tuple[asyncio.Transport, KISSProtocol]:
     """
     Establish an async KISS-over-TCP connection.
 
@@ -266,13 +290,13 @@ async def create_tcp_connection(
 
 
 async def create_serial_connection(
-    port,
-    baudrate,
-    protocol_kwargs=None,
-    loop=None,
-    create_connection_kwargs=None,
-    kiss_settings=None,
-):
+    port: str,
+    baudrate: int,
+    protocol_kwargs: Optional[Dict[str, Any]] = None,
+    loop: Optional[asyncio.BaseEventLoop] = None,
+    create_connection_kwargs: Optional[Dict[str, Any]] = None,
+    kiss_settings: Optional[Dict[Command, bytes]] = None,
+) -> Tuple[asyncio.Transport, KISSProtocol]:
     """
     Establish an async Serial KISS connection.
 
