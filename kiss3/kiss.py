@@ -1,28 +1,46 @@
 """asyncio Protocol for extracting individual KISS frames from a byte stream."""
 import asyncio
-from typing import Callable, cast, Generic, Iterable, Optional, TypeVar
+import enum
+import functools
+from typing import Callable, cast, Generic, Iterable, Optional, TypeVar, Union
 
 from attrs import define, field
+import serial_asyncio
 
 from . import util
 from .ax25 import Frame
-from .constants import DATA_FRAME, FEND
+from .constants import FEND, KISS_OFF, KISS_ON
 
 __author__ = "Masen Furer KF7HVM <kf7hvm@0x26.net>"
 __copyright__ = "Copyright 2022 Masen Furer and Contributors"
 __license__ = "Apache License, Version 2.0"
 
 
-def handle_fend(
-    buffer: bytes,
-    strip_df_start: bool = True,
-) -> bytes:
+class Command(enum.Enum):
+    """
+    KISS Command Codes
+
+    http://en.wikipedia.org/wiki/KISS_(TNC)#Command_Codes
+    """
+
+    DATA_FRAME = b"\x00"
+    TX_DELAY = b"\x01"
+    PERSISTENCE = b"\x02"
+    SLOT_TIME = b"\x03"
+    TX_TAIL = b"\x04"
+    FULL_DUPLEX = b"\x05"
+    SET_HARDWARE = b"\x06"
+    RETURN = b"\xFF"
+
+
+def handle_fend(buffer: bytes, strip_df_start: bool = True) -> bytes:
     """
     Handle FEND (end of frame) encountered in a KISS data stream.
 
     :param buffer: the buffer containing the frame
     :param strip_df_start: remove leading null byte (DATA_FRAME opcode)
-    :return: the bytes of the frame without escape characters or frame end markers (FEND)
+    :return: the bytes of the frame without escape characters or frame
+             end markers (FEND)
     """
     frame = util.recover_special_codes(util.strip_nmea(bytes(buffer)))
     if strip_df_start:
@@ -36,11 +54,18 @@ _T = TypeVar("_T")
 @define
 class GenericDecoder(Generic[_T]):
     """Generic stateful decoder with a callback."""
+
     callback: Optional[Callable[[_T], None]] = field(default=None)
     _last_pframe: bytes = field(default=b"", init=False)
 
     @staticmethod
     def decode_frames(frame: bytes) -> Iterable[_T]:
+        """
+        Decode a single deframed byte chunk.
+
+        :param frame: should represent a single higher level frame to
+            decode in some way.
+        """
         yield cast(_T, frame)
 
     def update(self, new_data: bytes) -> Iterable[_T]:
@@ -53,12 +78,19 @@ class GenericDecoder(Generic[_T]):
         yield cast(_T, new_data)
 
     def flush(self) -> Iterable[_T]:
+        """Call when the stream is closing to decode any final buffered bytes."""
         if self._last_pframe:
             yield from self.decode_frames(self._last_pframe)
 
 
 @define
 class KISSDecode(GenericDecoder[bytes]):
+    """
+    Stateful KISS framing decoder.
+
+    Decoded frames remain as raw bytes.
+    """
+
     strip_df_start: bool = field(default=True)
 
     def decode_frames(self, frame: bytes) -> Iterable[bytes]:
@@ -87,6 +119,12 @@ class KISSDecode(GenericDecoder[bytes]):
 
 
 class AX25KISSDecode(KISSDecode):
+    """
+    Stateful AX25 framing decoder.
+
+    Decoded frames are `kiss3.Frame` objects
+    """
+
     def decode_frames(self, frame: bytes) -> Iterable[Frame]:
         for kiss_frame in super().decode_frames(frame):
             yield from Frame.from_bytes(kiss_frame)
@@ -94,38 +132,169 @@ class AX25KISSDecode(KISSDecode):
 
 @define
 class KISSProtocol(asyncio.Protocol):
+    """A protocol for encoding and decoding KISS frames."""
+
     transport: Optional[asyncio.Transport] = field(default=None)
     decoder: KISSDecode = field(factory=AX25KISSDecode)
     frames: asyncio.Queue = field(factory=asyncio.Queue, init=False)
+    connection_future: asyncio.Future = field(factory=asyncio.Future, init=False)
 
     def connection_made(self, transport: asyncio.Transport) -> None:
+        """
+        asyncio callback when connection is established.
+
+        Because this protocol exposes higher-level read/write operations that
+        require the transport, an awaitable `connection_future` is completed for consumers
+        who depend on an active connection.
+        """
         self.transport = transport
+        self.connection_future.set_result(transport)
 
     def connection_lost(self, exc: Exception) -> None:
+        """asyncio callback when connection is lost."""
         for frame in self.decoder.flush():
             self.frames.put_nowait(frame)
 
     def data_received(self, data: bytes) -> None:
+        """Pass data off to decoder instance and put frames on the queue."""
         for frame in self.decoder.update(data):
             self.frames.put_nowait(frame)
 
     async def read(self) -> Iterable[Frame]:
-        while not self.transport.is_closing():
+        """Iterate through decoded frames until the transport drops."""
+        transport = await self._transport_future
+        while not transport.is_closing():
             yield await self.frames.get()
 
-    def write(self, frame: bytes) -> None:
+    def write(self, frame: bytes, command: Command = Command.DATA_FRAME) -> None:
+        """
+        Write the framed bytes to the transport.
+
+        :param frame: any bytes-able object that can be sent via KISS
+        :param command: kiss Command to send with the frame, default is 0x00 (DATA)
+        """
         frame_escaped = util.escape_special_codes(bytes(frame))
-        frame_kiss = b"".join([FEND, DATA_FRAME, frame_escaped, FEND])
+        frame_kiss = b"".join([FEND, command.value, frame_escaped, FEND])
         return self.transport.write(frame_kiss)
 
+    def write_setting(self, name: Command, value: Union[bytes, int]) -> None:
+        """
+        Writes KISS Command Codes to attached device.
 
-async def create_tcp_connection(host, port, loop=None, **kwargs) :
+        http://en.wikipedia.org/wiki/KISS_(TNC)#Command_Codes
+
+        :param name: KISS Command Code enum
+        :param value: KISS Command Code Value to write.
+        """
+        # Do the reasonable thing if a user passes an int
+        if isinstance(value, int):
+            value = bytes([value])
+
+        return self.write(
+            util.escape_special_codes(value),
+            command=name,
+        )
+
+    def write_settings(self, **settings):
+        """Write a dictionary of settings."""
+        for name, value in settings.items():
+            self.write_setting(name, value)
+
+    def kiss_on(self) -> None:
+        """Turns KISS ON."""
+        self.transport.write(KISS_ON)
+
+    def kiss_off(self) -> None:
+        """Turns KISS OFF."""
+        self.transport.write(KISS_OFF)
+
+
+def _handle_kwargs(protocol_kwargs, create_connection_kwargs, **kwargs):
+    """Handle async connection kwarg combination to avoid duplication."""
+    if create_connection_kwargs is None:
+        create_connection_kwargs = {}
+    create_connection_kwargs.update(kwargs)
+    create_connection_kwargs["protocol_factory"] = functools.partial(
+        create_connection_kwargs.pop("protocol_factory", KISSProtocol),
+        **(protocol_kwargs or {})
+    )
+    return create_connection_kwargs
+
+
+async def _generic_create_connection(f, args, kwargs, kiss_settings):
+    """Create a generic KISS connection and apply settings."""
+    transport, protocol = await f(*args, **kwargs)
+    if kiss_settings:
+        await protocol.connection_future()
+        protocol.write_settings(kiss_settings)  # type: ignore
+    return transport, protocol
+
+
+async def create_tcp_connection(
+    host,
+    port,
+    protocol_kwargs=None,
+    loop=None,
+    create_connection_kwargs=None,
+    kiss_settings=None,
+):
+    """
+    Establish an async KISS-over-TCP connection.
+
+    :param host: the host to connect to
+    :param port: the TCP port to connect to
+    :param protocol_kwargs: These kwargs are passed directly to KISSProtocol
+    :param loop: override the asyncio event loop (default calls `get_event_loop()`)
+    :param create_connection_kwargs: These kwargs are passed directly to
+        loop.create_connection
+    :param kiss_settings: dictionary of (Command, bytes) pairs to send after connecting
+    :return: (TCPTransport, KISSProtocol)
+    """
     if loop is None:
         loop = asyncio.get_event_loop()
+    return await _generic_create_connection(
+        loop.create_connection,
+        args=tuple(),
+        kwargs=_handle_kwargs(
+            protocol_kwargs=protocol_kwargs,
+            create_connection_kwargs=create_connection_kwargs,
+            host=host,
+            port=port,
+        ),
+        kiss_settings=kiss_settings,
+    )
 
-    return await loop.create_connection(
-        protocol_factory=KISSProtocol,
-        host=host,
-        port=port,
-        **kwargs
+
+async def create_serial_connection(
+    port,
+    baudrate,
+    protocol_kwargs=None,
+    loop=None,
+    create_connection_kwargs=None,
+    kiss_settings=None,
+):
+    """
+    Establish an async Serial KISS connection.
+
+    :param port: the serial port device (platform dependent)
+    :param baudrate: serial port speed
+    :param protocol_kwargs: These kwargs are passed directly to KISSProtocol
+    :param loop: override the asyncio event loop (default calls `get_event_loop()`)
+    :param create_connection_kwargs: These kwargs are passed directly to
+        loop.create_connection
+    :param kiss_settings: dictionary of (Command, bytes) pairs to send after connecting
+    :return: (SerialTransport, KISSProtocol)
+    """
+    if loop is None:
+        loop = asyncio.get_event_loop()
+    kwargs = _handle_kwargs(
+        protocol_kwargs=protocol_kwargs,
+        create_connection_kwargs=create_connection_kwargs,
+        baudrate=baudrate,
+    )
+    return await _generic_create_connection(
+        serial_asyncio.create_serial_connection,
+        args=(loop, kwargs.pop("protocol_factory"), port),
+        kwargs=kwargs,
+        kiss_settings=kiss_settings,
     )
