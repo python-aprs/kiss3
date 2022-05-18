@@ -10,7 +10,7 @@ from typing import Any, Callable, Iterable, List, Optional, Union, Type
 
 import serial
 
-from . import constants, exceptions, util
+from . import constants, exceptions, kiss, util
 
 __author__ = "Greg Albrecht W2GMD <oss@undef.net>"  # NOQA pylint: disable=R0801
 __copyright__ = (
@@ -25,8 +25,8 @@ class KISS(abc.ABC):
     _logger = util.getLogger(__name__)  # pylint: disable=R0801
 
     def __init__(self, strip_df_start: bool = False) -> None:
-        self.strip_df_start = strip_df_start
         self.interface = None
+        self.decoder = kiss.KISSDecode(strip_df_start=strip_df_start)
 
     def __enter__(self) -> "KISS":
         return self
@@ -117,17 +117,7 @@ class KISS(abc.ABC):
             callback,
         )
 
-        read_buffer = bytearray()
         frames = []
-
-        def handle_fend():
-            frame = util.recover_special_codes(util.strip_nmea(bytes(read_buffer)))
-            if self.strip_df_start:
-                frame = util.strip_df_start(frame)
-            frames.append(frame)
-            if callback is not None:
-                callback(frame)
-            read_buffer.clear()
 
         while min_frames is None or len(frames) < min_frames:
             read_data = self._read_handler(chunk_size)
@@ -144,15 +134,9 @@ class KISS(abc.ABC):
                         callback(read_data)
                     return [read_data]
 
-            # Normal frame splitting loop
-            for byte in read_data:
-                if byte == constants.FEND[0]:
-                    if read_buffer:
-                        handle_fend()
-                else:
-                    read_buffer.append(byte)
-        if read_buffer:
-            handle_fend()
+            self.decoder.callback = callback
+            frames.extend(self.decoder.update(read_data))
+        frames.extend(self.decoder.flush())
         return frames
 
     def write(self, frame: bytes) -> int:
