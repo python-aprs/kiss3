@@ -149,7 +149,7 @@ class KISSProtocol(asyncio.Protocol):
     transport: Optional[asyncio.Transport] = field(default=None)
     decoder: KISSDecode = field(factory=AX25KISSDecode)
     frames: asyncio.Queue = field(factory=asyncio.Queue, init=False)
-    connection_future: asyncio.Future[asyncio.Transport] = field(
+    connection_future: asyncio.Future = field(
         factory=asyncio.Future,
         init=False,
     )
