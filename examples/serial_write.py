@@ -13,7 +13,7 @@ KISS_SPEED = os.environ.get("KISS_SPEED", "9600")
 
 
 def main():
-    frame = kiss3.Frame(
+    frame = kiss3.Frame.ui(
         destination=kiss3.Address.from_text("PYKISS"),
         source=kiss3.Address.from_text(MYCALL),
         path=[kiss3.Address.from_text("WIDE1-1")],
@@ -22,7 +22,7 @@ def main():
 
     ki = kiss3.SerialKISS(port=KISS_SERIAL, speed=KISS_SPEED)
     ki.start()
-    ki.write(frame.encode_ax25())
+    ki.write(frame)
 
 
 if __name__ == "__main__":

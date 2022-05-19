@@ -46,13 +46,13 @@ def print_frame(frame):
 def main():
     ki = kiss3.TCPKISS(host=KISS_HOST, port=int(KISS_PORT), strip_df_start=True)
     ki.start()
-    frame = kiss3.Frame(
+    frame = kiss3.Frame.ui(
         destination=kiss3.Address.from_text("PYKISS"),
         source=kiss3.Address.from_text(MYCALL),
         path=[kiss3.Address.from_text("WIDE1-1")],
         info=">Hello World!",
     )
-    ki.write(frame.encode_ax25())
+    ki.write(frame)
     ki.read(callback=print_frame)
 
 
