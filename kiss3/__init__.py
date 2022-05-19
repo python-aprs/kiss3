@@ -14,6 +14,7 @@ Python KISS Module.
 :source: <https://github.com/ampledata/kiss>
 
 """
+from importlib_metadata import version
 
 from .ax25 import (  # noqa: F401
     Address,
@@ -73,3 +74,5 @@ __copyright__ = (
     "Copyright 2017 Greg Albrecht and Contributors"  # NOQA pylint: disable=R0801
 )
 __license__ = "Apache License, Version 2.0"  # NOQA pylint: disable=R0801
+__distribution__ = "kiss3"
+__version__ = version(__distribution__)

@@ -77,9 +77,6 @@ class KISS(abc.ABC):
 
         return self.protocol.write_setting(getattr(kiss.Command, name), value)
 
-    async def _read_upto(self, n_frames):
-        return [f async for f in self.protocol.read(n_frames=n_frames)]
-
     def read(
         self,
         chunk_size: Optional[int] = None,
@@ -106,7 +103,7 @@ class KISS(abc.ABC):
         )
 
         self.decoder.callback = callback
-        return self.loop.run_until_complete(self._read_upto(n_frames=min_frames))
+        return self.protocol.read_frames(n_frames=min_frames, loop=self.loop)
 
     def write(self, frame: bytes) -> None:
         """

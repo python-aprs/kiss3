@@ -16,6 +16,7 @@ authors = [
 dependencies = [
     "attrs > 20",
     "bitarray > 2.5.0",
+    "importlib-metadata >= 1.4",
     "pyserial-asyncio >= 0.6"
 ]
 readme = "README.rst"
