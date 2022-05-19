@@ -76,8 +76,6 @@ class Address:
         address = address_spec.strip("*")
         callsign_str, found, ssid_str = address.partition("-")
         callsign = callsign_str.encode("utf-8")
-        if len(callsign) > 6:
-            raise ValueError("Cannot represent callsign > 6 bytes: {}".format(callsign))
 
         ssid = int(ssid_str) if ssid_str else 0
         init_kwargs = dict(
