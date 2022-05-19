@@ -250,6 +250,7 @@ class Frame:
         path: Optional[Sequence[Union[Address, str]]] = None,
         info: bytes = b"",
     ):
+        """Create a UI frame with the given information."""
         return cls(
             destination=Address.from_any(destination),
             source=Address.from_any(source, a7_hldc=not bool(path)),
@@ -259,6 +260,14 @@ class Frame:
 
     @classmethod
     def from_bytes(cls, ax25_bytes: bytes) -> Sequence["Frame"]:
+        """
+        Decode the frame from AX.25.
+
+        This method can handle raw AX.25 bytestream with flags and fcs values
+        OR simple KISS AX.25 frames that are missing start/end flags. When
+        the end flag is missing, it is assumed that the packet does not contain
+        an FCS either.
+        """
         packet_start = 0
         frames: List[Frame] = []
         while 0 < (packet_start + 1) < len(ax25_bytes):
@@ -325,9 +334,7 @@ class Frame:
     from_ax25 = from_bytes
 
     def __bytes__(self) -> bytes:
-        """
-        Encodes an APRS Frame as AX.25.
-        """
+        """Encode the frame as AX.25."""
         encoded_frame = [
             bytes(self.destination),
             bytes(self.source),
@@ -348,6 +355,7 @@ class Frame:
 
     @classmethod
     def from_str(cls, ax25_text: str) -> "Frame":
+        """Decode the frame from TNC2 monitor format."""
         source_text, gt, rem = ax25_text.partition(">")
         destination_text, has_path, rem = rem.partition(",")
         path_csv, colon, info_text = rem.partition(":")
@@ -363,6 +371,7 @@ class Frame:
         )
 
     def __str__(self) -> str:
+        """Serialize the frame as TNC2 monitor format."""
         full_path = [
             str(self.destination),
             *(str(p) for p in self.path or []),
