@@ -175,11 +175,21 @@ class KISSProtocol(asyncio.Protocol):
         for frame in self.decoder.update(data):
             self.frames.put_nowait(frame)
 
-    async def read(self) -> Iterable[Frame]:
-        """Iterate through decoded frames until the transport drops."""
-        transport = await self._transport_future
-        while not transport.is_closing():
+    async def read(self, n_frames=None) -> Iterable[Frame]:
+        """
+        Iterate through decoded frames.
+
+        If n_frames is specified, exit after yielding that number of frames.
+        """
+        if n_frames is None:
+            n_frames = -1
+        transport = await self.connection_future
+        while not transport.is_closing() and n_frames:
             yield await self.frames.get()
+            n_frames -= 1
+        while not self.frames.empty() and n_frames:
+            yield await self.frames.get()
+            n_frames -= 1
 
     def write(self, frame: bytes, command: Command = Command.DATA_FRAME) -> None:
         """
