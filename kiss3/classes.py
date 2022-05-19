@@ -21,11 +21,22 @@ class KISS(abc.ABC):
     """KISS Object Abstract Class."""
 
     _logger = util.getLogger(__name__)  # pylint: disable=R0801
+    _loop = None
 
     def __init__(self, strip_df_start: bool = False) -> None:
         self.protocol = None
         self.decoder = kiss.KISSDecode(strip_df_start=strip_df_start)
-        self.loop = asyncio.get_event_loop()
+
+    @property
+    def loop(self) -> asyncio.BaseEventLoop:
+        """Get a reference to a shared event loop for this class."""
+        if KISS._loop is None:
+            try:
+                KISS._loop = asyncio.get_running_loop()
+            except RuntimeError:
+                KISS._loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(KISS._loop)
+        return KISS._loop
 
     def __enter__(self) -> "KISS":
         return self

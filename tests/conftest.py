@@ -43,25 +43,32 @@ class MockTransport:
         self.buffer.write(data)
 
 
+async def make_mock_connection(kiss_instance=None):
+    protocol = kiss.KISSProtocol()
+    transport = MockTransport(protocol)
+    if kiss_instance:
+        protocol.decoder = kiss_instance.decoder
+        kiss_instance.protocol = protocol
+    return transport, protocol
+
+
 @pytest.fixture
 def dummy_serialkiss():
     ks = kiss3.SerialKISS(port=random_alphanum(), speed="9600", strip_df_start=True)
-    ks.protocol = kiss.KISSProtocol()
-    ks.transport = MockTransport(ks.protocol)
+    ks.transport, ks.protocol = ks.loop.run_until_complete(make_mock_connection(ks))
     return ks
 
 
 @pytest.fixture(params=[TCPKISS, SerialKISS])
 def kiss_instance(request, monkeypatch):
     def make_instance(data_buffer=b"", **kwargs):
-        protocol = kiss.KISSProtocol()
-        transport = MockTransport(protocol)
         if request.param is TCPKISS:
-            k = TCPKISS("localhost", "8001", **kwargs)
-        if request.param is SerialKISS:
+            k = TCPKISS("localhost", 8001, **kwargs)
+        elif request.param is SerialKISS:
             k = SerialKISS("/dev/foo", "9600", **kwargs)
-        protocol.decoder = k.decoder
-        k.protocol = protocol
+        else:
+            raise RuntimeError("Unexpected KISS class: {!r}".format(request.param))
+        transport, protocol = k.loop.run_until_complete(make_mock_connection(k))
         if data_buffer:
             transport.data_received_callback(data_buffer)
         transport.close()
