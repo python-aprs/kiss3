@@ -1,12 +1,11 @@
 import io
 from pathlib import Path
 import random
-from unittest import mock
 
 import pytest
 
 import kiss3
-from kiss3 import KISS, constants, SerialKISS, TCPKISS
+from kiss3 import kiss, SerialKISS, TCPKISS
 from kiss3.ax25 import Address, Frame
 from kiss3.util import getLogger
 from .constants import ALPHANUM, TEST_FRAMES
@@ -22,69 +21,53 @@ __license__ = "Apache License, Version 2.0"  # NOQA pylint: disable=R0801
 logger = getLogger(__name__)
 
 
-class MockKISS(KISS):
-    def __init__(self, data_buffer=b"", **kwargs):
-        super().__init__(**kwargs)
-        self.buffer = io.BytesIO(data_buffer)
+class MockTransport:
+    def __init__(self, protocol):
+        self.buffer = io.BytesIO()
+        self.protocol = protocol
+        self.protocol.connection_made(self)
+        self.closed = False
 
-    def _read_handler(self, read_bytes=None):
-        return self.buffer.read(read_bytes or constants.READ_BYTES)
+    def close(self) -> None:
+        if not self.closed:
+            self.closed = True
+            self.protocol.connection_lost(None)
 
-    def _write_handler(self, frame=None):
-        if not frame:
-            return 0
-        return self.buffer.write(frame)
+    def is_closing(self) -> bool:
+        return self.closed
 
-    def start(self, **kwargs):
-        return
+    def data_received_callback(self, data: bytes) -> None:
+        self.protocol.data_received(data)
 
-    def stop(self):
-        return
-
-
-@pytest.fixture
-def dummy_interface():
-    return mock.Mock()
+    def write(self, data):
+        self.buffer.write(data)
 
 
 @pytest.fixture
-def dummy_serialkiss(dummy_interface):
+def dummy_serialkiss():
     ks = kiss3.SerialKISS(port=random_alphanum(), speed="9600", strip_df_start=True)
-    ks.interface = dummy_interface
+    ks.protocol = kiss.KISSProtocol()
+    ks.transport = MockTransport(ks.protocol)
     return ks
 
 
-@pytest.fixture(params=[MockKISS, TCPKISS, SerialKISS])
-def kiss_instance(request):
-    if request.param is MockKISS:
-        return MockKISS
-    if request.param is TCPKISS:
+@pytest.fixture(params=[TCPKISS, SerialKISS])
+def kiss_instance(request, monkeypatch):
+    def make_instance(data_buffer=b"", **kwargs):
+        protocol = kiss.KISSProtocol()
+        transport = MockTransport(protocol)
+        if request.param is TCPKISS:
+            k = TCPKISS("localhost", "8001", **kwargs)
+        if request.param is SerialKISS:
+            k = SerialKISS("/dev/foo", "9600", **kwargs)
+        protocol.decoder = k.decoder
+        k.protocol = protocol
+        if data_buffer:
+            transport.data_received_callback(data_buffer)
+        transport.close()
+        return k
 
-        def make_tcp(data_buffer=b"", **kwargs):
-            tk = TCPKISS("localhost", "8001", **kwargs)
-            tk.interface = mock.Mock()
-            tk.buffer = io.BytesIO(data_buffer)
-            tk.interface.recv = tk.buffer.read
-            tk.interface.send = tk.buffer.write
-            return tk
-
-        return make_tcp
-    if request.param is SerialKISS:
-
-        class BytesIOSerial(io.BytesIO):
-            @property
-            def in_waiting(self):
-                return int(self.readable())
-
-            def isOpen(self):
-                return self.tell() < len(self.getbuffer())
-
-        def make_serial(data_buffer=b"", **kwargs):
-            sk = SerialKISS("/dev/foo", "9600", **kwargs)
-            sk.buffer = sk.interface = BytesIOSerial(data_buffer)
-            return sk
-
-        return make_serial
+    return make_instance
 
 
 @pytest.fixture
