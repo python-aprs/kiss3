@@ -22,6 +22,7 @@ import serial_asyncio
 from . import util
 from .ax25 import Frame
 from .constants import FEND, KISS_OFF, KISS_ON
+from .util import FrameDecodeProtocol, GenericDecoder
 
 __author__ = "Masen Furer KF7HVM <kf7hvm@0x26.net>"
 __copyright__ = "Copyright 2022 Masen Furer and Contributors"
@@ -60,41 +61,6 @@ def handle_fend(buffer: bytes, strip_df_start: bool = True) -> bytes:
     return bytes(frame)
 
 
-_T = TypeVar("_T")
-
-
-@define
-class GenericDecoder(Generic[_T]):
-    """Generic stateful decoder with a callback."""
-
-    callback: Optional[Callable[[_T], None]] = field(default=None)
-    _last_pframe: bytes = field(default=b"", init=False)
-
-    @staticmethod
-    def decode_frames(frame: bytes) -> Iterable[_T]:
-        """
-        Decode a single deframed byte chunk.
-
-        :param frame: should represent a single higher level frame to
-            decode in some way.
-        """
-        yield cast(_T, frame)
-
-    def update(self, new_data: bytes) -> Iterable[_T]:
-        """
-        Decode the next sequence of bytes from the stream.
-
-        :param new_data: the next bytes from the stream
-        :return: an iterable of decoded frames
-        """
-        yield cast(_T, new_data)
-
-    def flush(self) -> Iterable[_T]:
-        """Call when the stream is closing to decode any final buffered bytes."""
-        if self._last_pframe:
-            yield from self.decode_frames(self._last_pframe)
-
-
 @define
 class KISSDecode(GenericDecoder[bytes]):
     """
@@ -104,6 +70,7 @@ class KISSDecode(GenericDecoder[bytes]):
     """
 
     strip_df_start: bool = field(default=True)
+    _last_pframe: bytes = field(default=b"", init=False)
 
     def decode_frames(self, frame: bytes) -> Iterable[bytes]:
         yield handle_fend(frame, strip_df_start=self.strip_df_start)
@@ -129,67 +96,30 @@ class KISSDecode(GenericDecoder[bytes]):
                     self.callback(decoded_frame)
                 yield decoded_frame
 
+    def flush(self) -> Iterable[bytes]:
+        """Call when the stream is closing to decode any final buffered bytes."""
+        if self._last_pframe:
+            yield from self.decode_frames(self._last_pframe)
+
 
 class AX25KISSDecode(KISSDecode):
     """
-    Stateful AX25 framing decoder.
+    AX25 framing decoder.
 
     Decoded frames are `kiss3.Frame` objects
     """
 
     def decode_frames(self, frame: bytes) -> Iterable[Frame]:
         for kiss_frame in super().decode_frames(frame):
-            yield from Frame.from_bytes(kiss_frame)
+            try:
+                yield from Frame.from_bytes(kiss_frame)
+            except Exception:
+                log.debug("Ignore frame AX.25 decode error %r", frame, exc_info=True)
 
 
 @define
-class KISSProtocol(asyncio.Protocol):
+class KISSProtocol(FrameDecodeProtocol[Frame]):
     """A protocol for encoding and decoding KISS frames."""
-
-    transport: Optional[asyncio.Transport] = field(default=None)
-    decoder: KISSDecode = field(factory=AX25KISSDecode)
-    frames: asyncio.Queue = field(factory=asyncio.Queue, init=False)
-    connection_future: asyncio.Future = field(
-        factory=asyncio.Future,
-        init=False,
-    )
-
-    def connection_made(self, transport: asyncio.Transport) -> None:
-        """
-        asyncio callback when connection is established.
-
-        Because this protocol exposes higher-level read/write operations that
-        require the transport, an awaitable `connection_future` is completed for consumers
-        who depend on an active connection.
-        """
-        self.transport = transport
-        self.connection_future.set_result(transport)
-
-    def connection_lost(self, exc: Exception) -> None:
-        """asyncio callback when connection is lost."""
-        for frame in self.decoder.flush():
-            self.frames.put_nowait(frame)
-
-    def data_received(self, data: bytes) -> None:
-        """Pass data off to decoder instance and put frames on the queue."""
-        for frame in self.decoder.update(data):
-            self.frames.put_nowait(frame)
-
-    async def read(self, n_frames=None) -> Iterable[Frame]:
-        """
-        Iterate through decoded frames.
-
-        If n_frames is specified, exit after yielding that number of frames.
-        """
-        if n_frames is None:
-            n_frames = -1
-        transport = await self.connection_future
-        while not transport.is_closing() and n_frames:
-            yield await self.frames.get()
-            n_frames -= 1
-        while not self.frames.empty() and n_frames:
-            yield await self.frames.get()
-            n_frames -= 1
 
     def write(self, frame: bytes, command: Command = Command.DATA_FRAME) -> None:
         """
