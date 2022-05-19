@@ -5,8 +5,6 @@ from kiss3 import constants
 from kiss3.ax25 import Frame
 from kiss3.util import getLogger
 
-from .conftest import MockKISS
-
 
 __author__ = "Greg Albrecht W2GMD <oss@undef.net>"  # NOQA pylint: disable=R0801
 __copyright__ = (
@@ -47,13 +45,15 @@ def test_frame_split(
     )
 
 
-def test_read_write_read_frame(sample_frame):
-    rk = MockKISS(data_buffer=sample_frame, strip_df_start=True)
+def test_read_write_read_frame(kiss_instance, sample_frame):
+    rk = kiss_instance(data_buffer=sample_frame, strip_df_start=True)
     frames = rk.read()
     assert len(frames) == 1
-    wk = MockKISS()
+    wk = kiss_instance()
     wk.write(frames[0])
-    rk2 = MockKISS(data_buffer=wk.buffer.getvalue(), strip_df_start=True)
+    rk2 = kiss_instance(
+        data_buffer=wk.protocol.transport.buffer.getvalue(), strip_df_start=True
+    )
     frames2 = rk2.read()
     assert len(frames2) == 1
     assert frames[0] == frames2[0]
@@ -64,7 +64,7 @@ def test_write_frame(kiss_instance):
     k = kiss_instance(data_buffer=b"")
     k.write(data)
     assert (
-        k.buffer.getvalue()
+        k.protocol.transport.buffer.getvalue()
         == constants.FEND + constants.DATA_FRAME + data + constants.FEND
     )
 
@@ -84,7 +84,7 @@ def test_read_write_escape(kiss_instance, data, exp_data, direction):
     if direction == "write":
         k.write(data)
         assert (
-            k.buffer.getvalue()
+            k.protocol.transport.buffer.getvalue()
             == constants.FEND + constants.DATA_FRAME + exp_data + constants.FEND
         )
     elif direction == "read":
@@ -118,21 +118,24 @@ def test_read_write_escape(kiss_instance, data, exp_data, direction):
         ("RETURN", b"\x00", b"".join([constants.RETURN, b"\x00"])),
     ),
 )
-def test_write_setting(name, value, exp_data):
-    k = MockKISS()
+def test_write_setting(kiss_instance, name, value, exp_data):
+    k = kiss_instance()
     k.write_setting(name, value)
-    assert k.buffer.getvalue() == constants.FEND + exp_data + constants.FEND
+    assert (
+        k.protocol.transport.buffer.getvalue()
+        == constants.FEND + exp_data + constants.FEND
+    )
 
 
-def test_config_xastir(dummy_serialkiss, dummy_interface):
+def test_config_xastir(dummy_serialkiss):
     """Tests writing Xastir config to KISS TNC."""
     dummy_serialkiss.config_xastir()
-    print(dummy_interface.mock_calls)
+    print(dummy_serialkiss.protocol.transport.buffer.getvalue())
 
 
 @pytest.fixture
 def payload_frame_kiss(payload_frame):
-    frame_encoded = payload_frame.encode_ax25()
+    frame_encoded = bytes(payload_frame)
     logger.debug('frame_encoded="%s"', frame_encoded)
 
     frame_escaped = kiss3.escape_special_codes(frame_encoded)
@@ -144,12 +147,12 @@ def payload_frame_kiss(payload_frame):
 
 
 def test_write_ax25(kiss_instance, payload_frame, payload_frame_kiss):
-    frame_encoded = payload_frame.encode_ax25()
+    frame_encoded = bytes(payload_frame)
     logger.debug('frame_encoded="%s"', frame_encoded)
 
     ks = kiss_instance(strip_df_start=True)
     ks.write(frame_encoded)
-    assert ks.buffer.getvalue() == payload_frame_kiss
+    assert ks.protocol.transport.buffer.getvalue() == payload_frame_kiss
 
 
 @pytest.mark.parametrize("min_frames", [1, 2, 10])

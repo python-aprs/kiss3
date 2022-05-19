@@ -14,9 +14,9 @@ authors = [
     {name = "Greg Albrecht W2GMD", email = "oss@undef.net"}
 ]
 dependencies = [
-    "pyserial > 3.4.0",
+    "attrs > 20",
     "bitarray > 2.5.0",
-    "attrs > 20"
+    "pyserial-asyncio >= 0.6"
 ]
 readme = "README.rst"
 license = {file = "LICENSE"}

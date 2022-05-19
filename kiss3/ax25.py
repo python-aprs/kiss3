@@ -2,7 +2,7 @@
 """AX.25 encode/decode"""
 import enum
 import re
-from typing import List, Optional, Sequence, Union
+from typing import Any, List, Optional, Sequence, Union
 
 import attr.validators
 from attrs import define, field
@@ -44,7 +44,7 @@ class Address:
     _logger = util.getLogger(__name__)  # pylint: disable=R0801
 
     @classmethod
-    def from_ax25(cls, ax25_address: bytes) -> "Address":
+    def from_bytes(cls, ax25_address: bytes, **kwargs: Any) -> "Address":
         if len(ax25_address) != 7:
             raise ValueError(
                 "ax25 address must be 7 bytes, got {}".format(len(ax25_address))
@@ -56,12 +56,22 @@ class Address:
         c_or_h = a7[0]
         r = a7[1:3]  # noqa: F841
         hldc = a7[7]
-        return cls(
-            callsign=callsign, ssid=ssid, digi=c_or_h if hldc else False, a7_hldc=hldc
+        init_kwargs = dict(
+            callsign=callsign,
+            ssid=ssid,
+            digi=c_or_h if hldc else False,
+            a7_hldc=hldc,
         )
+        if kwargs:
+            init_kwargs.update(kwargs)
+        return cls(**init_kwargs)
+
+    from_ax25 = from_bytes
 
     @classmethod
-    def from_text(cls, address_spec: str, a7_hldc: bool = False) -> "Address":
+    def from_str(
+        cls, address_spec: str, a7_hldc: bool = False, **kwargs: Any
+    ) -> "Address":
         digi = "*" in address_spec
         address = address_spec.strip("*")
         callsign_str, found, ssid_str = address.partition("-")
@@ -70,29 +80,42 @@ class Address:
             raise ValueError("Cannot represent callsign > 6 bytes: {}".format(callsign))
 
         ssid = int(ssid_str) if ssid_str else 0
-        return cls(callsign=callsign, ssid=ssid, digi=digi, a7_hldc=digi or a7_hldc)
+        init_kwargs = dict(
+            callsign=callsign,
+            ssid=ssid,
+            digi=digi,
+            a7_hldc=digi or a7_hldc,
+        )
+        if kwargs:
+            init_kwargs.update(**kwargs)
+        return cls(**init_kwargs)
 
-    def __repr(self) -> str:
-        return "{}(callsign={!r}, ssid={!r}, digi={!r}, a7_hldc={!r})".format(
-            type(self).__name__,
-            self.callsign,
-            self.ssid,
-            self.digi,
-            self.a7_hldc,
+    from_text = from_str
+
+    @classmethod
+    def from_any(
+        cls, address: Union["Address", bytes, str], **kwargs: Any
+    ) -> "Address":
+        if isinstance(address, cls):
+            if kwargs:
+                address = address.evolve(**kwargs)
+            return address
+        elif isinstance(address, bytes):
+            return cls.from_bytes(address, **kwargs)
+        return cls.from_str(str(address), **kwargs)
+
+    def __str__(self) -> str:
+        return "".join(
+            [
+                self.callsign.decode("latin1"),
+                # Append SSID if non-zero
+                "-%d" % self.ssid if self.ssid else "",
+                # If callsign was digipeated, append '*'.
+                "*" if self.digi else "",
+            ]
         )
 
     def __bytes__(self) -> bytes:
-        address = self.callsign + (b"-%d" % self.ssid if self.ssid else b"")
-
-        # If callsign was digipeated, append '*'.
-        if self.digi:
-            return address + b"*"
-        return address
-
-    def __str__(self) -> str:
-        return bytes(self).decode("utf-8")
-
-    def encode_ax25(self) -> bytearray:
         if len(self.callsign) > 6:
             raise ValueError(
                 "Cannot encode callsign > 6 bytes: {}".format(self.callsign)
@@ -103,7 +126,7 @@ class Address:
         a7[0] = self.digi and self.a7_hldc
         a7[1:3] = True  # r
         a7[7] = self.a7_hldc
-        return bytearray(callsign + a7.tobytes())
+        return callsign + a7.tobytes()
 
     def evolve(self, **kwargs) -> "Address":
         return attr.evolve(self, **kwargs)
@@ -176,6 +199,9 @@ class Control:
     def p_f(self) -> bool:
         return bool(self.bv[4])
 
+    def __bytes__(self) -> bytes:
+        return self.v
+
 
 def bytes_or_encode_utf8(v):
     if isinstance(v, (bytes, bytearray)):
@@ -217,7 +243,31 @@ class Frame:
     _logger = util.getLogger(__name__)
 
     @classmethod
-    def from_ax25(cls, ax25_bytes: bytes) -> Sequence["Frame"]:
+    def ui(
+        cls,
+        destination: Union[Address, str],
+        source: Union[Address, str],
+        path: Optional[Sequence[Union[Address, str]]] = None,
+        info: bytes = b"",
+    ):
+        """Create a UI frame with the given information."""
+        return cls(
+            destination=Address.from_any(destination),
+            source=Address.from_any(source, a7_hldc=not bool(path)),
+            path=[Address.from_any(p, a7_hldc=(p == path[-1])) for p in path or []],
+            info=info,
+        )
+
+    @classmethod
+    def from_bytes(cls, ax25_bytes: bytes) -> Sequence["Frame"]:
+        """
+        Decode the frame from AX.25.
+
+        This method can handle raw AX.25 bytestream with flags and fcs values
+        OR simple KISS AX.25 frames that are missing start/end flags. When
+        the end flag is missing, it is assumed that the packet does not contain
+        an FCS either.
+        """
         packet_start = 0
         frames: List[Frame] = []
         while 0 < (packet_start + 1) < len(ax25_bytes):
@@ -281,46 +331,53 @@ class Frame:
             )
         return frames
 
-    def __repr(self) -> str:
-        """
-        Returns a string representation of this Object.
-        """
-        full_path = [str(self.destination)]
-        full_path.extend([str(p) for p in self.path])
-        frame = "%s>%s:%s" % (self.source, ",".join(full_path), self.info)
-        return frame
+    from_ax25 = from_bytes
 
-    def __bytes(self) -> bytes:
-        full_path = [bytes(self.destination)]
-        full_path.extend([bytes(p) for p in self.path])
-        frame = b"%s>%s:%s" % (
-            bytes(self.source),
-            b",".join(full_path),
-            bytes(self.info),
-        )
-        return frame
-
-    def encode_ax25(self) -> bytearray:
-        """
-        Encodes an APRS Frame as AX.25.
-        """
+    def __bytes__(self) -> bytes:
+        """Encode the frame as AX.25."""
         encoded_frame = [
-            self.destination.encode_ax25(),
-            self.source.encode_ax25(),
-            b"".join(p.encode_ax25() for p in self.path[:-1]),
-            attr.evolve(self.path[-1], a7_hldc=True).encode_ax25()
-            if self.path
-            else b"",
-            self.control.v,
+            bytes(self.destination),
+            bytes(self.source),
+            *(bytes(p) for p in self.path),
+            bytes(self.control),
         ]
         if self.control.ftype in (FrameType.I, FrameType.U_UI):
             encoded_frame.append(self.pid)
         encoded_frame.append(self.info)
         checkable_bytes = b"".join(encoded_frame)
         if not self.fcs:
-            # KISS-over-TCP can't make use of an fcs here
-            return bytearray(checkable_bytes)
+            # KISS-over-TCP does not make use of fcs
+            return checkable_bytes
         if self.fcs is True:
             # unthaw to set the fcs value once we know it
             object.__setattr__(self, "fcs", FCS.from_bytes(checkable_bytes).digest())
-        return bytearray(b"".join([checkable_bytes, self.fcs]))
+        return b"".join([AX25_FLAG_B, checkable_bytes, self.fcs, AX25_FLAG_B])
+
+    @classmethod
+    def from_str(cls, ax25_text: str) -> "Frame":
+        """Decode the frame from TNC2 monitor format."""
+        source_text, gt, rem = ax25_text.partition(">")
+        destination_text, has_path, rem = rem.partition(",")
+        path_csv, colon, info_text = rem.partition(":")
+        if has_path:
+            path = [Address.from_text(p) for p in path_csv.split(",")]
+        else:
+            path = []
+        return cls.ui(
+            destination=destination_text,
+            source=source_text,
+            path=path,
+            info=info_text.encode("latin1"),
+        )
+
+    def __str__(self) -> str:
+        """Serialize the frame as TNC2 monitor format."""
+        full_path = [
+            str(self.destination),
+            *(str(p) for p in self.path or []),
+        ]
+        return "%s>%s:%s" % (
+            str(self.source),
+            ",".join(full_path),
+            self.info.decode("latin1"),  # XXX: maybe latin1 is a better choice...
+        )
