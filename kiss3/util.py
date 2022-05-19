@@ -15,6 +15,10 @@ __copyright__ = (
 __license__ = "Apache License, Version 2.0"  # NOQA pylint: disable=R0801
 
 
+# indicates that no more frames will appear on this protocol
+EOF = object()
+
+
 def escape_special_codes(raw_codes):
     """
     Escape special codes, per KISS spec.
@@ -215,6 +219,7 @@ class FrameDecodeProtocol(asyncio.Protocol, Generic[_T]):
         """asyncio callback when connection is lost."""
         for frame in self.decoder.flush():
             self.frames.put_nowait(frame)
+        self.frames.put_nowait(EOF)
 
     async def read(self, n_frames=None) -> Iterable[_T]:
         """
@@ -225,11 +230,11 @@ class FrameDecodeProtocol(asyncio.Protocol, Generic[_T]):
         if n_frames is None:
             n_frames = -1
         transport = await self.connection_future
-        while not transport.is_closing() and n_frames:
-            yield await self.frames.get()
-            n_frames -= 1
-        while not self.frames.empty() and n_frames:
-            yield await self.frames.get()
+        while (not transport.is_closing() or not self.frames.empty()) and n_frames:
+            frame = await self.frames.get()
+            if frame is EOF:
+                break
+            yield frame
             n_frames -= 1
 
     def read_frames(
