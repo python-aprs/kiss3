@@ -251,7 +251,7 @@ def _handle_kwargs(
 
 
 async def _generic_create_connection(
-    f: Callable[[...], Awaitable[Tuple[asyncio.Transport, KISSProtocol]]],
+    f: Callable[..., Awaitable[Tuple[asyncio.Transport, KISSProtocol]]],
     args: Iterable[Any],
     kwargs: Dict[str, Any],
     kiss_settings: Dict[Command, bytes],
