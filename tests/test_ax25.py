@@ -1,6 +1,6 @@
 import pytest
 
-from kiss3.ax25 import Address
+from kiss3.ax25 import Address, Control, Frame
 
 
 __author__ = "Masen Furer KF7HVM <kf7hvm@0x26.net>"  # NOQA pylint: disable=R0801
@@ -39,3 +39,26 @@ def test_address_from_ax25(ax25_bytes, exp_address):
     a = Address.from_bytes(ax25_bytes)
     assert a == exp_address
     assert Address.from_str(str(a)) == exp_address
+
+
+@pytest.mark.parametrize(
+    "ax25_str, exp_frame",
+    (
+        (
+            "FOO>APRS:!4605.21N/12327.31W#RNG0125Foo comment",
+            Frame(
+                destination=Address(
+                    callsign=b"APRS", ssid=0, digi=False, a7_hldc=False
+                ),
+                source=Address(callsign=b"FOO", ssid=0, digi=False, a7_hldc=True),
+                path=[],
+                control=Control(b"\x03"),
+                pid=b"\xf0",
+                info=b"!4605.21N/12327.31W#RNG0125Foo comment",
+                fcs=None,
+            ),
+        ),
+    ),
+)
+def test_Frame_from_str(ax25_str, exp_frame):
+    assert Frame.from_str(ax25_str) == exp_frame

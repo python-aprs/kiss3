@@ -355,12 +355,9 @@ class Frame:
     def from_str(cls, ax25_text: str) -> "Frame":
         """Decode the frame from TNC2 monitor format."""
         source_text, gt, rem = ax25_text.partition(">")
-        destination_text, has_path, rem = rem.partition(",")
-        path_csv, colon, info_text = rem.partition(":")
-        if has_path:
-            path = [Address.from_text(p) for p in path_csv.split(",")]
-        else:
-            path = []
+        address_field, colon, info_text = rem.partition(":")
+        destination_text, *paths_text = address_field.split(",")
+        path = [Address.from_text(p) for p in paths_text]
         return cls.ui(
             destination=destination_text,
             source=source_text,
