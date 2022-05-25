@@ -243,12 +243,15 @@ class FrameDecodeProtocol(asyncio.Protocol, Generic[_T]):
 
     def read_frames(
         self,
-        n_frames: int,
+        n_frames: Optional[int],
         loop: Optional[asyncio.BaseEventLoop] = None,
     ) -> Iterable[_T]:
         """Blocking read of the given number of frames."""
         if loop is None:
             loop = asyncio.get_event_loop()
+
+        if n_frames is not None and n_frames < 0:
+            n_frames = self.frames.qsize()
 
         async def _():
             return [f async for f in self.read(n_frames)]
