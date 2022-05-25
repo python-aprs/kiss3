@@ -17,7 +17,7 @@ from .ax25 import (
     FrameType,
 )
 from .classes import AbstractKISS, SerialKISS, TCPKISS
-from .kiss import create_serial_connection, create_tcp_connection, KISSProtocol
+from .kiss import create_serial_connection, create_tcp_connection, KISSDecode, KISSProtocol
 from .tnc2 import TNC2Protocol
 
 
@@ -36,6 +36,7 @@ __all__ = [
     "create_tcp_connection",
     "Frame",
     "FrameType",
+    "KISSDecode",
     "KISSProtocol",
     "SerialKISS",
     "TCPKISS",
