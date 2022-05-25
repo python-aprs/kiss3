@@ -170,7 +170,6 @@ class SerialKISS(KISS):
     def __init__(self, port: str, speed: str, strip_df_start: bool = False) -> None:
         self.port = port
         self.speed = speed
-        self.strip_df_start = strip_df_start
         super(SerialKISS, self).__init__(strip_df_start)
 
     def _write_defaults(self, **kwargs: Any) -> None:
