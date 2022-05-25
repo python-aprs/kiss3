@@ -8,6 +8,8 @@ import asyncio
 from types import TracebackType
 from typing import Any, Callable, List, Optional, Union, Type
 
+from attrs import define, field
+
 from . import constants, kiss, util
 
 __author__ = "Greg Albrecht W2GMD <oss@undef.net>"  # NOQA pylint: disable=R0801
@@ -17,28 +19,27 @@ __copyright__ = (
 __license__ = "Apache License, Version 2.0"  # NOQA pylint: disable=R0801
 
 
-class KISS(abc.ABC):
-    """KISS Object Abstract Class."""
+@define
+class AbstractKISS(abc.ABC):
+    """Abstract KISS object provides a syncronous interface over async protocol."""
 
     _logger = util.getLogger(__name__)  # pylint: disable=R0801
     _loop = None
 
-    def __init__(self, strip_df_start: bool = False) -> None:
-        self.protocol = None
-        self.decoder = kiss.KISSDecode(strip_df_start=strip_df_start)
+    protocol: Optional[asyncio.Protocol] = field(default=None)
 
     @property
     def loop(self) -> asyncio.BaseEventLoop:
         """Get a reference to a shared event loop for this class."""
-        if KISS._loop is None:
+        if AbstractKISS._loop is None:
             try:
-                KISS._loop = asyncio.get_running_loop()
+                AbstractKISS._loop = asyncio.get_running_loop()
             except RuntimeError:
-                KISS._loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(KISS._loop)
-        return KISS._loop
+                AbstractKISS._loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(AbstractKISS._loop)
+        return AbstractKISS._loop
 
-    def __enter__(self) -> "KISS":
+    def __enter__(self) -> "AbstractKISS":
         return self
 
     def __exit__(
@@ -64,6 +65,37 @@ class KISS(abc.ABC):
         Helper method to call when starting KISS interface.
         """
 
+    def read(
+        self,
+        min_frames: Optional[int] = None,
+    ) -> List[bytes]:  # NOQA pylint: disable=R0912
+        """
+        Reads data from KISS device until exhausted.
+
+        :param min_frames: return after reading this many frames (if None,
+            return after EOF is seen)
+        :type min_frames: int
+        :return: List of frames
+        :rtype: list
+        """
+        return self.protocol.read_frames(n_frames=min_frames, loop=self.loop)
+
+    def write(self, frame: bytes) -> None:
+        """
+        Writes frame to KISS interface.
+
+        :param frame: Frame to write.
+        """
+        self.protocol.write(frame)
+
+
+class KISS(AbstractKISS):
+    """KISS Object representing a TNC."""
+
+    def __init__(self, strip_df_start: bool = False) -> None:
+        super().__init__()
+        self.decoder = kiss.KISSDecode(strip_df_start=strip_df_start)
+
     def write_setting(self, name: str, value: Union[bytes, int]) -> None:
         """
         Writes KISS Command Codes to attached device.
@@ -78,10 +110,10 @@ class KISS(abc.ABC):
         return self.protocol.write_setting(getattr(kiss.Command, name), value)
 
     def read(
-        self,
-        chunk_size: Optional[int] = None,
-        callback: Optional[Callable[[bytes], Any]] = None,
-        min_frames: Optional[int] = None,
+            self,
+            chunk_size: Optional[int] = None,
+            callback: Optional[Callable[[bytes], Any]] = None,
+            min_frames: Optional[int] = None,
     ) -> List[bytes]:  # NOQA pylint: disable=R0912
         """
         Reads data from KISS device until exhausted.
@@ -103,15 +135,7 @@ class KISS(abc.ABC):
         )
 
         self.decoder.callback = callback
-        return self.protocol.read_frames(n_frames=min_frames, loop=self.loop)
-
-    def write(self, frame: bytes) -> None:
-        """
-        Writes frame to KISS interface.
-
-        :param frame: Frame to write.
-        """
-        self.protocol.write(frame)
+        return super().read(min_frames=min_frames)
 
 
 class TCPKISS(KISS):
