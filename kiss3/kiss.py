@@ -22,11 +22,14 @@ import serial_asyncio
 from . import util
 from .ax25 import Frame
 from .constants import FEND, KISS_OFF, KISS_ON
-from .util import FrameDecodeProtocol, GenericDecoder
+from .util import FrameDecodeProtocol, GenericDecoder, getLogger
 
 __author__ = "Masen Furer KF7HVM <kf7hvm@0x26.net>"
 __copyright__ = "Copyright 2022 Masen Furer and Contributors"
 __license__ = "Apache License, Version 2.0"
+
+
+log = getLogger(__name__)
 
 
 class Command(enum.Enum):
