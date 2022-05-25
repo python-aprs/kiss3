@@ -1,9 +1,8 @@
 import pytest
 
-import kiss3
 from kiss3 import constants
 from kiss3.ax25 import Frame
-from kiss3.util import getLogger
+from kiss3.util import getLogger, escape_special_codes
 
 
 __author__ = "Greg Albrecht W2GMD <oss@undef.net>"  # NOQA pylint: disable=R0801
@@ -138,10 +137,12 @@ def payload_frame_kiss(payload_frame):
     frame_encoded = bytes(payload_frame)
     logger.debug('frame_encoded="%s"', frame_encoded)
 
-    frame_escaped = kiss3.escape_special_codes(frame_encoded)
+    frame_escaped = escape_special_codes(frame_encoded)
     logger.debug('frame_escaped="%s"', frame_escaped)
 
-    frame_kiss = b"".join([kiss3.FEND, kiss3.DATA_FRAME, frame_escaped, kiss3.FEND])
+    frame_kiss = b"".join(
+        [constants.FEND, constants.DATA_FRAME, frame_escaped, constants.FEND]
+    )
     logger.debug('frame_kiss="%s"', frame_kiss)
     return frame_kiss
 

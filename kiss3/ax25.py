@@ -341,7 +341,7 @@ class Frame:
         ]
         if self.control.ftype in (FrameType.I, FrameType.U_UI):
             encoded_frame.append(self.pid)
-        encoded_frame.append(self.info)
+        encoded_frame.append(bytes(self.info))
         checkable_bytes = b"".join(encoded_frame)
         if not self.fcs:
             # KISS-over-TCP does not make use of fcs
@@ -374,5 +374,7 @@ class Frame:
         return "%s>%s:%s" % (
             str(self.source),
             ",".join(full_path),
-            self.info.decode("latin1"),  # XXX: maybe latin1 is a better choice...
+            bytes(self.info).decode(
+                "latin1"
+            ),  # XXX: maybe latin1 is a better choice...
         )

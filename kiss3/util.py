@@ -157,9 +157,7 @@ _T = TypeVar("_T")
 
 @define
 class GenericDecoder(Generic[_T]):
-    """Generic stateful decoder with a callback."""
-
-    callback: Optional[Callable[[_T], None]] = field(default=None)
+    """Generic stateful decoder."""
 
     @staticmethod
     def decode_frames(frame: bytes) -> Iterable[_T]:
@@ -193,11 +191,17 @@ class FrameDecodeProtocol(asyncio.Protocol, Generic[_T]):
 
     transport: Optional[asyncio.Transport] = field(default=None)
     decoder: GenericDecoder = field(factory=GenericDecoder)
+    callback: Optional[Callable[[_T], None]] = field(default=None)
     frames: asyncio.Queue = field(factory=asyncio.Queue, init=False)
     connection_future: asyncio.Future = field(
         factory=asyncio.Future,
         init=False,
     )
+
+    def _queue_frame(self, frame: _T) -> None:
+        self.frames.put_nowait(frame)
+        if self.callback is not None:
+            self.callback(frame)
 
     def connection_made(self, transport: asyncio.Transport) -> None:
         """
@@ -213,12 +217,12 @@ class FrameDecodeProtocol(asyncio.Protocol, Generic[_T]):
     def data_received(self, data: bytes) -> None:
         """Pass data off to decoder instance and put frames on the queue."""
         for frame in self.decoder.update(data):
-            self.frames.put_nowait(frame)
+            self._queue_frame(frame)
 
     def connection_lost(self, exc: Exception) -> None:
         """asyncio callback when connection is lost."""
         for frame in self.decoder.flush():
-            self.frames.put_nowait(frame)
+            self._queue_frame(frame)
         self.frames.put_nowait(EOF)
 
     async def read(self, n_frames=None) -> Iterable[_T]:
@@ -239,12 +243,15 @@ class FrameDecodeProtocol(asyncio.Protocol, Generic[_T]):
 
     def read_frames(
         self,
-        n_frames: int,
+        n_frames: Optional[int],
         loop: Optional[asyncio.BaseEventLoop] = None,
     ) -> Iterable[_T]:
         """Blocking read of the given number of frames."""
         if loop is None:
             loop = asyncio.get_event_loop()
+
+        if n_frames is not None and n_frames < 0:
+            n_frames = self.frames.qsize()
 
         async def _():
             return [f async for f in self.read(n_frames)]
