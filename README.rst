@@ -1,6 +1,9 @@
 kiss3 - Python KISS Module
 **************************
 
+.. image:: https://github.com/python-aprs/kiss3/actions/workflows/pytest.yml/badge.svg
+    :target: https://github.com/python-aprs/kiss3/actions
+
 kiss3 is a Python Module that implements the
 `KISS Protocol <https://en.wikipedia.org/wiki/KISS_(TNC)>`_ for
 communicating with KISS-enabled devices (such as Serial or TCP TNCs)
