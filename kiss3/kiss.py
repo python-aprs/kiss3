@@ -92,8 +92,6 @@ class KISSDecode(GenericDecoder[bytes]):
 
         for kiss_frame in filter(None, new_data.split(FEND)):
             for decoded_frame in self.decode_frames(kiss_frame):
-                if self.callback is not None:
-                    self.callback(decoded_frame)
                 yield decoded_frame
 
     def flush(self) -> Iterable[bytes]:

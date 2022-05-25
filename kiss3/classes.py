@@ -135,7 +135,7 @@ class KISS(AbstractKISS):
             callback,
         )
 
-        self.decoder.callback = callback
+        self.protocol.callback = callback
         return super().read(min_frames=min_frames)
 
 
