@@ -15,6 +15,7 @@ Versions
 - 8.x branch from ``python-aprs`` as ``kiss3``, supports python 3.6+
 
 Previous versions were released by ``ampledata`` as ``kiss``:
+
 - 7.x.x branch and-on will be Python 3.x ONLY.
 - 6.5.x branch will be the last version of this Module that supports Python 2.7.x
 
