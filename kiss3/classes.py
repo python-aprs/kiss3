@@ -40,6 +40,7 @@ class AbstractKISS(abc.ABC):
         return AbstractKISS._loop
 
     def __enter__(self) -> "AbstractKISS":
+        self.start()
         return self
 
     def __exit__(
