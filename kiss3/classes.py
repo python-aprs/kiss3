@@ -93,9 +93,11 @@ class AbstractKISS(abc.ABC):
 class KISS(AbstractKISS):
     """KISS Object representing a TNC."""
 
+    decode_class = kiss.KISSDecode
+
     def __init__(self, strip_df_start: bool = False) -> None:
         super().__init__()
-        self.decoder = kiss.KISSDecode(strip_df_start=strip_df_start)
+        self.decoder = self.decode_class(strip_df_start=strip_df_start)
 
     def write_setting(self, name: str, value: Union[bytes, int]) -> None:
         """
