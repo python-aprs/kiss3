@@ -113,10 +113,10 @@ class KISS(AbstractKISS):
         return self.protocol.write_setting(getattr(kiss.Command, name), value)
 
     def read(
-            self,
-            chunk_size: Optional[int] = None,
-            callback: Optional[Callable[[bytes], Any]] = None,
-            min_frames: Optional[int] = None,
+        self,
+        chunk_size: Optional[int] = None,
+        callback: Optional[Callable[[bytes], Any]] = None,
+        min_frames: Optional[int] = None,
     ) -> List[bytes]:  # NOQA pylint: disable=R0912
         """
         Reads data from KISS device until exhausted.

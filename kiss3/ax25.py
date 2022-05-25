@@ -374,5 +374,7 @@ class Frame:
         return "%s>%s:%s" % (
             str(self.source),
             ",".join(full_path),
-            bytes(self.info).decode("latin1"),  # XXX: maybe latin1 is a better choice...
+            bytes(self.info).decode(
+                "latin1"
+            ),  # XXX: maybe latin1 is a better choice...
         )

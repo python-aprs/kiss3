@@ -140,7 +140,9 @@ def payload_frame_kiss(payload_frame):
     frame_escaped = escape_special_codes(frame_encoded)
     logger.debug('frame_escaped="%s"', frame_escaped)
 
-    frame_kiss = b"".join([constants.FEND, constants.DATA_FRAME, frame_escaped, constants.FEND])
+    frame_kiss = b"".join(
+        [constants.FEND, constants.DATA_FRAME, frame_escaped, constants.FEND]
+    )
     logger.debug('frame_kiss="%s"', frame_kiss)
     return frame_kiss
 
