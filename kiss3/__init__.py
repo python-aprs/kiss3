@@ -18,8 +18,6 @@ from .kiss import (
     AX25KISSDecode,
     KISSProtocol,
 )
-from .tnc2 import TNC2Protocol
-
 
 __author__ = "Greg Albrecht W2GMD <oss@undef.net>"  # NOQA pylint: disable=R0801
 __copyright__ = (
