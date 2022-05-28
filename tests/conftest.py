@@ -4,9 +4,10 @@ import random
 
 import pytest
 
+from ax253 import Address, Frame
+
 import kiss3
 from kiss3 import kiss, SerialKISS, TCPKISS
-from kiss3.ax25 import Address, Frame
 from kiss3.util import getLogger
 from .constants import ALPHANUM, TEST_FRAMES
 

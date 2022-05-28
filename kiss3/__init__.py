@@ -10,14 +10,14 @@ kiss3 Python KISS Module.
 """
 from importlib_metadata import version
 
-from .ax25 import (
-    Address,
-    Control,
-    Frame,
-    FrameType,
+from .classes import SerialKISS, TCPKISS
+from .kiss import (
+    create_serial_connection,
+    create_tcp_connection,
+    KISSDecode,
+    AX25KISSDecode,
+    KISSProtocol,
 )
-from .classes import AbstractKISS, SerialKISS, TCPKISS
-from .kiss import create_serial_connection, create_tcp_connection, KISSDecode, KISSProtocol
 from .tnc2 import TNC2Protocol
 
 
@@ -29,13 +29,9 @@ __license__ = "Apache License, Version 2.0"  # NOQA pylint: disable=R0801
 __distribution__ = "kiss3"
 __version__ = version(__distribution__)
 __all__ = [
-    "AbstractKISS",
-    "Address",
-    "Control",
+    "AX25KISSDecode",
     "create_serial_connection",
     "create_tcp_connection",
-    "Frame",
-    "FrameType",
     "KISSDecode",
     "KISSProtocol",
     "SerialKISS",

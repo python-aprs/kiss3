@@ -10,9 +10,9 @@ from typing import (
 )
 
 from attrs import define, field
+from ax253 import Frame, FrameDecodeProtocol, GenericDecoder
 
-from .ax25 import Frame
-from .util import FrameDecodeProtocol, GenericDecoder, getLogger
+from .util import getLogger
 
 __author__ = "Masen Furer KF7HVM <kf7hvm@0x26.net>"
 __copyright__ = "Copyright 2022 Masen Furer and Contributors"
@@ -49,7 +49,7 @@ class TNC2Decode(GenericDecoder[Frame]):
 class TNC2Protocol(FrameDecodeProtocol[Frame]):
     """Protocol for decoding a stream of TNC2 format packets."""
 
-    decoder: GenericDecoder = field(factory=TNC2Decode)
+    decoder: TNC2Decode = field(factory=TNC2Decode)
 
     def write(self, frame: Frame) -> None:
         """Write the Frame to the transport."""

@@ -94,5 +94,3 @@ Copyright 2017 Greg Albrecht and Contributors
 License
 =======
 Apache License, Version 2.0. See LICENSE for details.
-
-`fcs.py <./kiss3/fcs.py>`_ - BSD 2-clause Simplified License

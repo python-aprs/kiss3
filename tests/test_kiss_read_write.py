@@ -1,7 +1,8 @@
 import pytest
 
+from ax253 import Frame
+
 from kiss3 import constants
-from kiss3.ax25 import Frame
 from kiss3.util import getLogger, escape_special_codes
 
 
@@ -39,9 +40,9 @@ def test_frame_split(
         assert frame == exp_frames[len(seen_frames)]
         seen_frames.append(frame)
 
-    assert (
-        k.read(chunk_size=2, callback=fr_callback, min_frames=min_frames) == exp_frames
-    )
+    assert k.read(callback=fr_callback, min_frames=min_frames) == exp_frames
+    # check that the callback fired for every frame
+    assert seen_frames == exp_frames
 
 
 def test_read_write_read_frame(kiss_instance, sample_frame):
@@ -163,6 +164,5 @@ def test_read_ax25(kiss_instance, payload_frame_kiss, payload_frame, min_frames)
     frames = ks.read()
     assert len(frames) >= min_frames
     for frame in frames:
-        decoded_frame = Frame.from_ax25(frame)
-        assert len(decoded_frame) == 1
-        assert decoded_frame[0] == payload_frame
+        decoded_frame = Frame.from_bytes(frame)
+        assert decoded_frame == payload_frame

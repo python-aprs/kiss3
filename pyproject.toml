@@ -15,6 +15,7 @@ authors = [
 ]
 dependencies = [
     "attrs > 20",
+    "ax253 > 0.1.2",
     "bitarray > 2.5.0",
     "importlib-metadata >= 1.4",
     "pyserial-asyncio >= 0.6"

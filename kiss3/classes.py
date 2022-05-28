@@ -1,14 +1,8 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
-
 """Python KISS Module Class Definitions."""
 
-import abc
-import asyncio
-from types import TracebackType
-from typing import Any, Callable, List, Optional, Union, Type
+from typing import Any, Union
 
-from attrs import define, field
+from ax253 import SyncFrameDecode
 
 from . import constants, kiss, util
 
@@ -19,81 +13,11 @@ __copyright__ = (
 __license__ = "Apache License, Version 2.0"  # NOQA pylint: disable=R0801
 
 
-@define
-class AbstractKISS(abc.ABC):
-    """Abstract KISS object provides a syncronous interface over async protocol."""
-
-    _logger = util.getLogger(__name__)  # pylint: disable=R0801
-    _loop = None
-
-    protocol: Optional[asyncio.Protocol] = field(default=None)
-
-    @property
-    def loop(self) -> asyncio.BaseEventLoop:
-        """Get a reference to a shared event loop for this class."""
-        if AbstractKISS._loop is None:
-            try:
-                AbstractKISS._loop = asyncio.get_running_loop()
-            except RuntimeError:
-                AbstractKISS._loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(AbstractKISS._loop)
-        return AbstractKISS._loop
-
-    def __enter__(self) -> "AbstractKISS":
-        self.start()
-        return self
-
-    def __exit__(
-        self,
-        exc_type: Optional[Type[BaseException]],
-        exc: Optional[BaseException],
-        traceback: Optional[TracebackType],
-    ) -> Optional[bool]:
-        return self.stop()
-
-    def __del__(self) -> None:
-        return self.stop()
-
-    @abc.abstractmethod
-    def stop(self) -> None:
-        """
-        Helper method to call when stopping KISS interface.
-        """
-
-    @abc.abstractmethod
-    def start(self, **kwargs: Any) -> None:
-        """
-        Helper method to call when starting KISS interface.
-        """
-
-    def read(
-        self,
-        min_frames: Optional[int] = None,
-    ) -> List[bytes]:  # NOQA pylint: disable=R0912
-        """
-        Reads data from KISS device until exhausted.
-
-        :param min_frames: return after reading this many frames (if None,
-            return after EOF is seen)
-        :type min_frames: int
-        :return: List of frames
-        :rtype: list
-        """
-        return self.protocol.read_frames(n_frames=min_frames, loop=self.loop)
-
-    def write(self, frame: bytes) -> None:
-        """
-        Writes frame to KISS interface.
-
-        :param frame: Frame to write.
-        """
-        self.protocol.write(frame)
-
-
-class KISS(AbstractKISS):
+class KISS(SyncFrameDecode):
     """KISS Object representing a TNC."""
 
     decode_class = kiss.KISSDecode
+    _logger = util.getLogger(__name__)
 
     def __init__(self, strip_df_start: bool = False) -> None:
         super().__init__()
@@ -112,37 +36,8 @@ class KISS(AbstractKISS):
 
         return self.protocol.write_setting(getattr(kiss.Command, name), value)
 
-    def read(
-        self,
-        chunk_size: Optional[int] = None,
-        callback: Optional[Callable[[bytes], Any]] = None,
-        min_frames: Optional[int] = None,
-    ) -> List[bytes]:  # NOQA pylint: disable=R0912
-        """
-        Reads data from KISS device until exhausted.
-
-        :param chunk_size: Number of bytes to read from socket.
-        :param callback: Callback to call with decoded data.
-        :param min_frames: return after reading this many frames (if None,
-            return after EOF is seen)
-        :type chunk_size: int
-        :type callback: func accepting bytes
-        :type min_frames: int
-        :return: List of frames
-        :rtype: list
-        """
-        self._logger.debug(
-            "read_bytes=%s callback=%s",
-            chunk_size,
-            callback,
-        )
-
-        self.protocol.callback = callback
-        return super().read(min_frames=min_frames)
-
 
 class TCPKISS(KISS):
-
     """KISS TCP Class."""
 
     def __init__(self, host: str, port: int, strip_df_start: bool = False):
@@ -166,7 +61,6 @@ class TCPKISS(KISS):
 
 
 class SerialKISS(KISS):
-
     """KISS Serial Class."""
 
     def __init__(self, port: str, speed: str, strip_df_start: bool = False) -> None:

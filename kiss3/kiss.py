@@ -6,9 +6,7 @@ from typing import (
     Any,
     Awaitable,
     Callable,
-    cast,
     Dict,
-    Generic,
     Iterable,
     Optional,
     Tuple,
@@ -19,17 +17,17 @@ from typing import (
 from attrs import define, field
 import serial_asyncio
 
+from ax253 import Frame, FrameDecodeProtocol, GenericDecoder
+
 from . import util
-from .ax25 import Frame
 from .constants import FEND, KISS_OFF, KISS_ON
-from .util import FrameDecodeProtocol, GenericDecoder, getLogger
 
 __author__ = "Masen Furer KF7HVM <kf7hvm@0x26.net>"
 __copyright__ = "Copyright 2022 Masen Furer and Contributors"
 __license__ = "Apache License, Version 2.0"
 
 
-log = getLogger(__name__)
+log = util.getLogger(__name__)
 
 
 class Command(enum.Enum):
@@ -64,21 +62,27 @@ def handle_fend(buffer: bytes, strip_df_start: bool = True) -> bytes:
     return bytes(frame)
 
 
-@define
-class KISSDecode(GenericDecoder[bytes]):
-    """
-    Stateful KISS framing decoder.
+_T = TypeVar("_T")
 
-    Decoded frames remain as raw bytes.
+
+@define
+class GenericKISSDecode(GenericDecoder[_T]):
+    """
+    Generic stateful KISS framing decoder.
+
+    Generic allows subclasses to return different types from
+    decode_frame and update after further decoding the deframed KISS data.
+
+    Direct subclassing without modification should apply `bytes` as _T
     """
 
     strip_df_start: bool = field(default=True)
     _last_pframe: bytes = field(default=b"", init=False)
 
-    def decode_frames(self, frame: bytes) -> Iterable[bytes]:
+    def decode_frames(self, frame: bytes) -> Iterable[_T]:
         yield handle_fend(frame, strip_df_start=self.strip_df_start)
 
-    def update(self, new_data: bytes) -> Iterable[bytes]:
+    def update(self, new_data: bytes) -> Iterable[_T]:
         trail_data_from = new_data.rfind(FEND)
         if trail_data_from < 0:
             # end of frame not found, this is just a chunk
@@ -103,11 +107,19 @@ class KISSDecode(GenericDecoder[bytes]):
             yield from self.decode_frames(self._last_pframe)
 
 
-class AX25KISSDecode(KISSDecode):
+class KISSDecode(GenericKISSDecode[bytes]):
+    """
+    Stateful KISS framing decoder.
+
+    Frames are returned as bytes (with KISS framing removed).
+    """
+
+
+class AX25KISSDecode(GenericKISSDecode[Frame]):
     """
     AX25 framing decoder.
 
-    Decoded frames are `kiss3.Frame` objects
+    Decoded frames are `ax253.Frame` objects
     """
 
     def decode_frames(self, frame: bytes) -> Iterable[Frame]:
@@ -121,6 +133,8 @@ class AX25KISSDecode(KISSDecode):
 @define
 class KISSProtocol(FrameDecodeProtocol[Frame]):
     """A protocol for encoding and decoding KISS frames."""
+
+    decoder: AX25KISSDecode = field(factory=AX25KISSDecode)
 
     def write(self, frame: bytes, command: Command = Command.DATA_FRAME) -> None:
         """
