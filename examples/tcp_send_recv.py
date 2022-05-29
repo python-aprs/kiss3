@@ -54,7 +54,7 @@ def main():
         info=">Hello World!",
     )
     ki.write(frame)
-    ki.read(callback=print_frame)
+    ki.read(callback=print_frame, min_frames=None)
 
 
 if __name__ == "__main__":
