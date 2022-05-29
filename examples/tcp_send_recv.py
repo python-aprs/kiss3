@@ -31,6 +31,7 @@ Test output should be as follows:
 """
 import os
 
+from ax253 import Frame
 import kiss3
 
 
@@ -40,16 +41,16 @@ KISS_PORT = os.environ.get("KISS_PORT", "8001")
 
 
 def print_frame(frame):
-    print(kiss3.Frame.from_ax25(frame))
+    print(Frame.from_bytes(frame))
 
 
 def main():
     ki = kiss3.TCPKISS(host=KISS_HOST, port=int(KISS_PORT), strip_df_start=True)
     ki.start()
-    frame = kiss3.Frame.ui(
-        destination=kiss3.Address.from_text("PYKISS"),
-        source=kiss3.Address.from_text(MYCALL),
-        path=[kiss3.Address.from_text("WIDE1-1")],
+    frame = Frame.ui(
+        destination="PYKISS",
+        source=MYCALL,
+        path=["WIDE1-1"],
         info=">Hello World!",
     )
     ki.write(frame)

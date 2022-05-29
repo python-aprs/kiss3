@@ -4,6 +4,7 @@ Send KISS frames to a Serial TNC.
 """
 import os
 
+from ax253 import Frame
 import kiss3
 
 
@@ -13,10 +14,10 @@ KISS_SPEED = os.environ.get("KISS_SPEED", "9600")
 
 
 def main():
-    frame = kiss3.Frame.ui(
-        destination=kiss3.Address.from_text("PYKISS"),
-        source=kiss3.Address.from_text(MYCALL),
-        path=[kiss3.Address.from_text("WIDE1-1")],
+    frame = Frame.ui(
+        destination="PYKISS",
+        source=MYCALL,
+        path=["WIDE1-1"],
         info=">Hello World!",
     )
 
