@@ -125,7 +125,7 @@ class AX25KISSDecode(GenericKISSDecode[Frame]):
     def decode_frames(self, frame: bytes) -> Iterable[Frame]:
         for kiss_frame in super().decode_frames(frame):
             try:
-                yield from Frame.from_bytes(kiss_frame)
+                yield Frame.from_bytes(kiss_frame)
             except Exception:
                 log.debug("Ignore frame AX.25 decode error %r", frame, exc_info=True)
 
