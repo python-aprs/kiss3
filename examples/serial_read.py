@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 """
 Reads & Prints KISS frames from a Serial console.
 
@@ -27,20 +27,25 @@ Test output should be as follows:
     WB2OSZ-15>TEST:,The quick brown fox jumps over the lazy dog!  4 of 4
 
 """
+import os
 
-import aprs
+import ax253
 import kiss
 
 
+KISS_SERIAL = os.environ.get("KISS_SERIAL", "/dev/cu.Repleo-PL2303-00303114")
+KISS_SPEED = os.environ.get("KISS_SPEED", "9600")
+
+
 def print_frame(frame):
-    print((aprs.Frame(frame)))
+    print((ax253.Frame.from_bytes(frame)))
 
 
 def main():
-    ki = kiss.SerialKISS(port='/dev/cu.Repleo-PL2303-00303114', speed='9600')
+    ki = kiss.SerialKISS(port=KISS_SERIAL, speed=KISS_SPEED, strip_df_start=True)
     ki.start()
-    ki.read(callback=print_frame, readmode=True)
+    ki.read(callback=print_frame, min_frames=1)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
