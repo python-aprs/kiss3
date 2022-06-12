@@ -7,7 +7,7 @@ requires = [
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "kiss"
+name = "kiss3"
 description = "A pure-Python implementation of serial KISS and KISS-over-TCP protocols for communicating with TNC devices"
 authors = [
     {name = "Masen Furer KF7HVM", email = "kf7hvm@0x26.net"},
@@ -34,6 +34,6 @@ keywords=[
 dynamic = ["version"]
 
 [project.urls]
-Homepage = "https://github.com/ampledata/kiss"
+Homepage = "https://github.com/python-aprs/kiss3"
 
 [tool.setuptools_scm]

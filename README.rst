@@ -1,7 +1,10 @@
-kiss - Python KISS Module
-*************************
+kiss3 - Python KISS Module
+**************************
 
-kiss is a Python Module that implements the
+.. image:: https://github.com/python-aprs/kiss3/actions/workflows/pytest.yml/badge.svg
+    :target: https://github.com/python-aprs/kiss3/actions
+
+kiss3 is a Python Module that implements the
 `KISS Protocol <https://en.wikipedia.org/wiki/KISS_(TNC)>`_ for
 communicating with KISS-enabled devices (such as Serial or TCP TNCs)
 and provides support for encoding and decoding AX.25 frames.
@@ -9,7 +12,7 @@ and provides support for encoding and decoding AX.25 frames.
 Versions
 ========
 
-- 8.x branch from ``python-aprs`` released in 2022 supports python 3.6+
+- 8.x branch from ``python-aprs`` as ``kiss3``, supports python 3.6+
 
 Previous versions were released by ``ampledata`` as ``kiss``:
 
@@ -18,7 +21,7 @@ Previous versions were released by ``ampledata`` as ``kiss``:
 
 Installation
 ============
-Install from pypi using pip: ``pip install kiss``
+Install from pypi using pip: ``pip install kiss3``
 
 
 Usage Examples
@@ -47,8 +50,8 @@ Run tox::
 See Also
 ========
 
-* `Python APRS Module <https://github.com/ampledata/aprs>`_ Library for sending, receiving and parsing APRS Frames to and from multiple Interfaces
-* `Python KISS Module <https://github.com/ampledata/kiss>`_ Handles interfacing-to and encoding-for various KISS Interfaces.
+* `Python APRS Module <https://github.com/python-aprs/aprs3>`_ Library for sending, receiving and parsing APRS Frames to and from multiple Interfaces
+* `Python KISS Module <https://github.com/python-aprs/kiss3>`_ Handles interfacing-to and encoding-for various KISS Interfaces.
 * `Python APRS Gateway <https://github.com/ampledata/aprsgate>`_ Uses Redis PubSub to run a multi-interface APRS Gateway.
 * `Python APRS Tracker <https://github.com/ampledata/aprstracker>`_ TK.
 * `dirus <https://github.com/ampledata/dirus>`_ Dirus is a daemon for managing a SDR to Dire Wolf interface. Manifests that interface as a KISS TCP port.
