@@ -1,14 +1,20 @@
 kiss - Python KISS Module
 *************************
 
-kiss is a Python Module that implementations the `KISS Protocol <https://en.wikipedia.org/wiki/KISS_(TNC)>`_ for
-communicating with KISS-enabled devices (such as Serial or TCP TNCs).
+kiss is a Python Module that implements the
+`KISS Protocol <https://en.wikipedia.org/wiki/KISS_(TNC)>`_ for
+communicating with KISS-enabled devices (such as Serial or TCP TNCs)
+and provides support for encoding and decoding AX.25 frames.
 
 Versions
 ========
 
-- 6.5.x branch will be the last version of this Module that supports Python 2.7.x
+- 8.x branch from ``python-aprs`` released in 2022 supports python 3.6+
+
+Previous versions were released by ``ampledata`` as ``kiss``:
+
 - 7.x.x branch and-on will be Python 3.x ONLY.
+- 6.5.x branch will be the last version of this Module that supports Python 2.7.x
 
 Installation
 ============
@@ -33,9 +39,9 @@ See also: examples/ directory.
 
 Testing
 =======
-Run nosetests from a Makefile target::
+Run tox::
 
-    make test
+    tox
 
 
 See Also
@@ -60,32 +66,22 @@ Similar Projects
 * `Ham-APRS-FAP <http://search.cpan.org/dist/Ham-APRS-FAP/>`_ by aprs.fi: A Perl APRS Parser.
 * `Dire Wolf <https://github.com/wb2osz/direwolf>`_ by WB2OSZ. A C-Based Soft-TNC for interfacing with sound cards. Can present as a KISS interface!
 
-Build Status
-============
-
-Master:
-
-.. image:: https://travis-ci.org/ampledata/kiss.svg?branch=master
-    :target: https://travis-ci.org/ampledata/kiss
-
-Develop:
-
-.. image:: https://travis-ci.org/ampledata/kiss.svg?branch=develop
-    :target: https://travis-ci.org/ampledata/kiss
-
-
 Source
 ======
 Github: https://github.com/ampledata/kiss
 
-Author
-======
+Authors
+=======
 Greg Albrecht W2GMD oss@undef.net
 
 http://ampledata.org/
 
+Masen Furer KF7HVM kf7hvm@0x26.net
+
 Copyright
 =========
+Copyright 2022 Masen Furer and Contributors
+
 Copyright 2017 Greg Albrecht and Contributors
 
 `Automatic Packet Reporting System (APRS) <http://www.aprs.org/>`_ is Copyright Bob Bruninga WB4APR wb4apr@amsat.org
