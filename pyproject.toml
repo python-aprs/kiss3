@@ -1,0 +1,39 @@
+[build-system]
+requires = [
+    "setuptools>=61",
+    "setuptools_scm[toml]>=6.2",
+    "wheel",
+]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "kiss"
+description = "A pure-Python implementation of serial KISS and KISS-over-TCP protocols for communicating with TNC devices"
+authors = [
+    {name = "Masen Furer KF7HVM", email = "kf7hvm@0x26.net"},
+    {name = "Greg Albrecht W2GMD", email = "oss@undef.net"}
+]
+dependencies = [
+    "attrs > 20",
+    "ax253 >= 0.1.5",
+    "bitarray > 2.5.0",
+    "importlib-metadata >= 1.4",
+    "pyserial-asyncio >= 0.6"
+]
+readme = "README.rst"
+license = {file = "LICENSE"}
+classifiers = [
+    "License :: OSI Approved :: Apache Software License",
+    "Topic :: Communications :: Ham Radio",
+    "Programming Language :: Python",
+    "License :: OSI Approved :: Apache Software License"
+]
+keywords=[
+    'Ham Radio', 'APRS', 'KISS'
+]
+dynamic = ["version"]
+
+[project.urls]
+Homepage = "https://github.com/ampledata/kiss"
+
+[tool.setuptools_scm]
