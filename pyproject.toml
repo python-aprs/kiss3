@@ -15,7 +15,6 @@ authors = [
 ]
 requires-python = ">=3.11"
 dependencies = [
-    "attrs > 20",
     "ax253 >= 0.1.5",
     "bitarray > 2.5.0",
     "pyserial-asyncio >= 0.6"
@@ -76,3 +75,7 @@ fail_under = 95
 
 [tool.ty.environment]
 python-version = "3.11"
+
+[tool.uv.sources]
+# TODO before merge: drop this and require the ax253 release without attrs
+ax253 = { git = "https://github.com/python-aprs/ax253", branch = "refactor/dataclasses" }

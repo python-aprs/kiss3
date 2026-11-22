@@ -192,36 +192,7 @@ def test_ax25_decoder_skips_undecodable_data_frame():
     assert [bytes(f) for f in frames] == [AX25]
 
 
-@pytest.mark.parametrize(
-    "value, ok",
-    [(b"a", True), (b"ab", True), (b"", False), (b"abc", False)],
-)
-def test_util_valid_length(value, ok):
-    import attr
-
-    @attr.s
-    class Holder:
-        v = attr.ib()
-
-    validator = util.valid_length(1, 2, attr.validators.instance_of(bytes))
-    if ok:
-        validator(None, attr.fields(Holder).v, value)
-    else:
-        with pytest.raises(ValueError):
-            validator(None, attr.fields(Holder).v, value)
-
-
-def test_util_instance_of_or_and_optional_bool_or_bytes():
-    import attr
-
-    @attr.s
-    class Holder:
-        v = attr.ib()
-
-    validator = util.instance_of_or(bool, attr.validators.instance_of(bytes))
-    validator(None, attr.fields(Holder).v, True)
-    with pytest.raises(TypeError):
-        validator(None, attr.fields(Holder).v, "x")
+def test_util_optional_bool_or_bytes():
     assert util.optional_bool_or_bytes(None) is None
     assert util.optional_bool_or_bytes(True) is True
     assert util.optional_bool_or_bytes(bytearray(b"x")) == b"x"

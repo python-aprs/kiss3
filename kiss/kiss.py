@@ -1,6 +1,7 @@
 """asyncio Protocol for extracting individual KISS frames from a byte stream."""
 
 import asyncio
+import dataclasses
 import enum
 import functools
 from collections.abc import Awaitable, Callable, Iterable
@@ -10,7 +11,6 @@ from typing import (
 )
 
 import serial_asyncio
-from attrs import define, field
 from ax253 import Frame, FrameDecodeProtocol, GenericDecoder
 
 from . import util
@@ -82,7 +82,7 @@ def handle_fend(buffer: bytes, strip_df_start: bool = True) -> bytes | None:
 _T = TypeVar("_T")
 
 
-@define
+@dataclasses.dataclass
 class GenericKISSDecode(GenericDecoder[_T]):
     """
     Generic stateful KISS framing decoder.
@@ -93,8 +93,8 @@ class GenericKISSDecode(GenericDecoder[_T]):
     Direct subclassing without modification should apply `bytes` as _T
     """
 
-    strip_df_start: bool = field(default=True)
-    _last_pframe: bytes = field(default=b"", init=False)
+    strip_df_start: bool = True
+    _last_pframe: bytes = dataclasses.field(default=b"", init=False, repr=False)
 
     def decode_frames(  # pylint: disable=arguments-differ
         self,
@@ -151,11 +151,11 @@ class AX25KISSDecode(GenericKISSDecode[Frame]):
                 log.debug("Ignore frame AX.25 decode error %r", frame, exc_info=True)
 
 
-@define
+@dataclasses.dataclass
 class KISSProtocol(FrameDecodeProtocol[Frame]):
     """A protocol for encoding and decoding KISS frames."""
 
-    decoder: AX25KISSDecode = field(factory=AX25KISSDecode)
+    decoder: AX25KISSDecode = dataclasses.field(default_factory=AX25KISSDecode)
 
     def write(self, frame: bytes, command: Command = Command.DATA_FRAME) -> None:
         """
