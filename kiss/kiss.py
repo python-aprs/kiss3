@@ -128,6 +128,7 @@ class GenericKISSDecode(GenericDecoder[_T]):
             yield from self.decode_frames(self._last_pframe)
 
 
+@dataclasses.dataclass(slots=True)
 class KISSDecode(GenericKISSDecode[bytes]):
     """
     Stateful KISS framing decoder.
@@ -136,6 +137,7 @@ class KISSDecode(GenericKISSDecode[bytes]):
     """
 
 
+@dataclasses.dataclass(slots=True)
 class AX25KISSDecode(GenericKISSDecode[Frame]):
     """
     Stateful AX25 framing decoder.
@@ -144,7 +146,9 @@ class AX25KISSDecode(GenericKISSDecode[Frame]):
     """
 
     def decode_frames(self, frame: bytes) -> Iterable[Frame]:
-        for kiss_frame in super().decode_frames(frame):
+        # explicit super(): slots=True dataclasses break the zero-argument form
+        # before Python 3.14
+        for kiss_frame in super(AX25KISSDecode, self).decode_frames(frame):
             try:
                 yield Frame.from_bytes(kiss_frame)
             except Exception:  # pylint: disable=broad-except

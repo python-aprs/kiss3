@@ -161,3 +161,10 @@ def test_kiss_on_off_write_bytes():
     p.transport.data = b""
     p.kiss_off()
     assert p.transport.data == FEND + b"\xff" + FEND + FEND
+
+
+def test_decoders_are_slotted():
+    from kiss.kiss import AX25KISSDecode, KISSDecode
+
+    for obj in (KISSDecode(), AX25KISSDecode()):
+        assert not hasattr(obj, "__dict__"), type(obj)
