@@ -3,6 +3,7 @@
 import asyncio
 import enum
 import functools
+import logging
 from collections.abc import Awaitable, Callable, Iterable
 from typing import (
     Any,
@@ -17,13 +18,16 @@ from . import util
 from .constants import DATA_FRAME, FEND, KISS_OFF, KISS_ON
 
 NMEA_START = b"\xf0"
+# T3-Micro NMEA passthrough: 0xF0 followed by the start of a sentence. A
+# bare 0xF0 command byte is a data frame on KISS port 15.
+NMEA_SENTENCE_START = NMEA_START + b"$"
 
 __author__ = "Masen Furer KF7HVM <kf7hvm@0x26.net>"
 __copyright__ = "Copyright 2022 Masen Furer and Contributors"
 __license__ = "Apache License, Version 2.0"
 
 
-log = util.getLogger(__name__)
+log = logging.getLogger(__name__)
 
 
 # pylint: disable=duplicate-code
@@ -61,7 +65,7 @@ def handle_fend(buffer: bytes, strip_df_start: bool = True) -> bytes | None:
              end markers (FEND), or None if the frame is not a data frame
     """
     buffer = bytes(buffer)
-    if buffer[:1] == NMEA_START:
+    if buffer[:2] == NMEA_SENTENCE_START:
         # T3-Micro style NMEA passthrough
         return bytes(util.recover_special_codes(util.strip_nmea(buffer)))
     frame = bytes(util.recover_special_codes(buffer))

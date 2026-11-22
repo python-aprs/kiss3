@@ -8,12 +8,9 @@ __copyright__ = "Copyright 2017 Greg Albrecht and Contributors"
 __license__ = "Apache License, Version 2.0"
 
 
-if bool(os.environ.get("DEBUG")):
-    LOG_LEVEL = logging.DEBUG
-    logging.debug("Debugging Enabled via DEBUG Environment Variable.")
-else:
-    LOG_LEVEL = logging.INFO
-
+# Kept for backwards compatibility only: kiss3 no longer configures logging
+# (handlers, levels or format); applications do.
+LOG_LEVEL = logging.DEBUG if os.environ.get("DEBUG") else logging.INFO
 LOG_FORMAT = logging.Formatter(
     "%(asctime)s kiss %(levelname)s %(name)s.%(funcName)s:%(lineno)d - %(message)s",
 )

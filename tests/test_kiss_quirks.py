@@ -20,7 +20,7 @@ def decode(data, strip_df_start=True, cls=kiss.KISSDecode):
 
 
 @pytest.mark.parametrize("port", range(15))
-def test_data_frame_any_port(port):
+def test_data_frame_any_port(port):  # port 15: see test_port_15_data_frame
     """
     Multi-port TNCs (e.g. dual-band, KPC-9612) put the port in the high nibble.
     Port 12's command byte is 0xC0 and must itself be escaped.
@@ -29,12 +29,14 @@ def test_data_frame_any_port(port):
     assert decode(FEND + command + AX25 + FEND) == [AX25]
 
 
-def test_port_15_is_nmea_passthrough():
+@pytest.mark.parametrize("suffix", [b"", b" ", b"\r\n"])
+def test_port_15_data_frame(suffix):
     """
-    0xF0 is both "port 15 data" and the T3-Micro NMEA lead byte; kiss3
-    treats it as NMEA (trailing whitespace stripped).
+    Issue #20: 0xF0 is the port 15 data command byte. It is only the
+    T3-Micro NMEA lead byte when a sentence ("$") follows, so port 15 AX.25
+    data keeps its command byte stripped and its trailing bytes intact.
     """
-    assert decode(FEND + b"\xf0" + AX25 + b"\r\n" + FEND) == [AX25]
+    assert decode(FEND + b"\xf0" + AX25 + suffix + FEND) == [AX25 + suffix]
 
 
 @pytest.mark.parametrize(

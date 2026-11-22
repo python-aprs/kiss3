@@ -1,6 +1,7 @@
 """Python KISS Module Utility Functions Definitions."""
 
 import logging
+import warnings
 
 from . import constants
 
@@ -56,11 +57,20 @@ def extract_ui(frame):
     """
     Extracts the UI component of an individual frame.
 
+    Deprecated: this legacy helper does not decode AX.25 correctly. Use
+    ``ax253.Frame.from_bytes`` on a frame from a decoder with
+    ``strip_df_start=True`` instead.
+
     :param frame: APRS/AX.25 frame.
-    :type frame: str
+    :type frame: bytes
     :returns: UI component of frame.
     :rtype: str
     """
+    warnings.warn(
+        "kiss.util.extract_ui is deprecated; decode frames with ax253.Frame.from_bytes",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     start_ui = frame.split(b"".join([constants.FEND, constants.DATA_FRAME]))
     end_ui = start_ui[0].split(
         b"".join([constants.SLOT_TIME, constants.NO_PROTOCOL_ID]),
@@ -70,14 +80,19 @@ def extract_ui(frame):
 
 def strip_df_start(frame):
     """
-    Strips KISS DATA_FRAME start (0x00) and newline from frame.
+    Strips the KISS DATA_FRAME command byte (0x00) from the start of a frame.
 
-    :param frame: APRS/AX.25 frame.
-    :type frame: str
-    :returns: APRS/AX.25 frame sans DATA_FRAME start (0x00).
-    :rtype: str
+    Only that one byte is removed: the AX.25 frame after it may itself start
+    with 0x00 or end in spaces, CR or LF, all of which are significant.
+
+    :param frame: KISS frame contents, starting with the command byte.
+    :type frame: bytes
+    :returns: the frame without its leading DATA_FRAME byte.
+    :rtype: bytes
     """
-    return frame.lstrip(constants.DATA_FRAME).strip()
+    if frame[:1] == constants.DATA_FRAME:
+        return frame[1:]
+    return frame
 
 
 def strip_nmea(frame):
@@ -92,17 +107,12 @@ def strip_nmea(frame):
 
 def getLogger(name):
     """
-    Get a logger hooked up with the appropriate levels and outputs.
-    """
-    logger = logging.getLogger(name)
+    Get the logger for ``name``.
 
-    if not logger.handlers:
-        logger.setLevel(constants.LOG_LEVEL)
-        console_handler = logging.StreamHandler()
-        console_handler.setLevel(constants.LOG_LEVEL)
-        console_handler.setFormatter(constants.LOG_FORMAT)
-        logger.addHandler(console_handler)
-    return logger
+    kiss3 is a library, so it no longer attaches handlers or sets levels:
+    configure logging in your application (e.g. ``logging.basicConfig``).
+    """
+    return logging.getLogger(name)
 
 
 def valid_length(at_least, at_most=None, sequence_validator=None):

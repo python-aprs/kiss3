@@ -9,6 +9,7 @@ Python KISS Module.
 :source: <https://github.com/ampledata/kiss>
 """
 
+import logging
 from importlib.metadata import version
 
 from .classes import TCPKISS, SerialKISS
@@ -26,6 +27,9 @@ __copyright__ = "Copyright 2017 Greg Albrecht and Contributors"
 __license__ = "Apache License, Version 2.0"
 __distribution__ = "kiss3"
 __version__ = version(__distribution__)
+
+# library logging etiquette: never print unless the application configures it
+logging.getLogger(__name__).addHandler(logging.NullHandler())
 __all__ = [
     "AX25KISSDecode",
     "create_serial_connection",

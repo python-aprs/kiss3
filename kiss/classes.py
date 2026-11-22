@@ -1,11 +1,12 @@
 """Python KISS Module Class Definitions."""
 
 import asyncio
+import logging
 from typing import Any, SupportsBytes
 
 from ax253 import SyncFrameDecode
 
-from . import constants, kiss, util
+from . import constants, kiss
 
 __author__ = "Greg Albrecht W2GMD <oss@undef.net>"
 __copyright__ = "Copyright 2017 Greg Albrecht and Contributors"
@@ -16,7 +17,7 @@ class KISS(SyncFrameDecode):
     """KISS Object representing a TNC."""
 
     decode_class = kiss.KISSDecode
-    _logger = util.getLogger(__name__)
+    _logger = logging.getLogger(__name__)
 
     def __init__(self, strip_df_start: bool = False) -> None:
         super().__init__()
