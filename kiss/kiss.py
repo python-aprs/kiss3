@@ -82,7 +82,7 @@ def handle_fend(buffer: bytes, strip_df_start: bool = True) -> bytes | None:
 _T = TypeVar("_T")
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(slots=True)
 class GenericKISSDecode(GenericDecoder[_T]):
     """
     Generic stateful KISS framing decoder.
@@ -151,7 +151,7 @@ class AX25KISSDecode(GenericKISSDecode[Frame]):
                 log.debug("Ignore frame AX.25 decode error %r", frame, exc_info=True)
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(slots=True)
 class KISSProtocol(FrameDecodeProtocol[Frame]):
     """A protocol for encoding and decoding KISS frames."""
 
