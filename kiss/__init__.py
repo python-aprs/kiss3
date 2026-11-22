@@ -1,12 +1,11 @@
-"""
-Python KISS Module.
-~~~~
+"""KISS framing for TNCs over serial and TCP.
 
+Encode and decode `KISS <https://en.wikipedia.org/wiki/KISS_(amateur_radio_protocol)>`_
+frames with a blocking interface (``SerialKISS``, ``TCPKISS``) or asyncio
+protocols (``create_serial_connection``, ``create_tcp_connection``).
 
-:author: Greg Albrecht W2GMD <oss@undef.net>
-:copyright: Copyright 2017 Greg Albrecht and Contributors
-:license: Apache License, Version 2.0
-:source: <https://github.com/ampledata/kiss>
+Based on the original ``kiss`` module by Greg Albrecht W2GMD
+(https://github.com/ampledata/kiss), Apache License 2.0.
 """
 
 import logging
