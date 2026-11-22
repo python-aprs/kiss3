@@ -1,5 +1,7 @@
 """Tests for KISS Util Module."""
 
+import pytest
+
 from kiss import constants, util
 
 __author__ = "Greg Albrecht W2GMD <oss@undef.net>"
@@ -25,4 +27,5 @@ def test_extract_ui(sample_frames):
     """
     Tests `util.extract_ui` util function.
     """
-    assert util.extract_ui(sample_frames[0]) == "APRX240W2GMD 6WIDE1 1"
+    with pytest.deprecated_call():  # issue #21
+        assert util.extract_ui(sample_frames[0]) == "APRX240W2GMD 6WIDE1 1"

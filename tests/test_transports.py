@@ -2,6 +2,7 @@
 
 import asyncio
 import contextlib
+import logging
 import os
 import socket
 import threading
@@ -210,12 +211,26 @@ def test_serialkiss_stop_releases_port(pty_pair):
 
 
 def test_util_helpers(sample_frames):
-    assert util.strip_df_start(b"\x00\x00abc \r\n") == b"abc"
+    # issue #21: exactly one command byte; the rest of the frame is kept
+    assert util.strip_df_start(b"\x00\x00abc \r\n") == b"\x00abc \r\n"
+    assert util.strip_df_start(b"abc") == b"abc"
+    assert util.strip_df_start(b"") == b""
     assert util.strip_nmea(b"\xf0$GPGGA\r\n") == b"$GPGGA"
     assert util.strip_nmea(b"") == b""
     log = util.getLogger("kiss.test.helper")
-    assert util.getLogger("kiss.test.helper") is log
-    assert len(log.handlers) == 1
+    assert log is logging.getLogger("kiss.test.helper")
+    assert log.handlers == []  # issue #19: no handler attached
+
+
+def test_library_loggers_do_not_configure_logging():
+    """Issue #19: kiss leaves handlers and levels to the application."""
+    for name in ("kiss.kiss", "kiss.classes"):
+        logger = logging.getLogger(name)
+        assert logger.handlers == []
+        assert logger.level == logging.NOTSET
+    assert all(
+        isinstance(h, logging.NullHandler) for h in logging.getLogger("kiss").handlers
+    )
 
 
 def test_serialkiss_kiss_on(pty_pair):
