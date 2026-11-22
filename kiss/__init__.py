@@ -8,7 +8,7 @@ Python KISS Module.
 :license: Apache License, Version 2.0
 :source: <https://github.com/ampledata/kiss>
 """
-from importlib_metadata import version
+from importlib.metadata import version
 
 from .classes import SerialKISS, TCPKISS
 from .kiss import (
