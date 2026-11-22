@@ -72,7 +72,7 @@ timeout = 30
 addopts = "--cov=kiss --cov-report=term-missing"
 
 [tool.coverage.report]
-fail_under = 75
+fail_under = 95
 
 [tool.ty.environment]
 python-version = "3.11"
