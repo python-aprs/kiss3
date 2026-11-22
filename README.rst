@@ -55,7 +55,7 @@ Without it, ``ax253.Frame.from_bytes()`` fails with an error like
 Detecting a lost connection
 ---------------------------
 ``k.read(min_frames=None)`` blocks until the connection closes, then returns
-the frames that were left. Check ``k.connected`` (needs the ax253 release after 0.2.0a0) to
+the frames that were left. Check ``k.connected`` to
 tell a closed connection from a quiet one, and call ``stop()`` and
 ``start()`` to reconnect::
 

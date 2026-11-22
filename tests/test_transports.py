@@ -7,9 +7,8 @@ import socket
 import threading
 import time
 
-import attrs
 import pytest
-from ax253 import Frame, SyncFrameDecode
+from ax253 import Frame
 
 from kiss import TCPKISS, SerialKISS, kiss, util
 from kiss.constants import FEND, KISS_ON
@@ -96,10 +95,6 @@ def test_tcpkiss_stop_closes_connection(tnc):
     k.stop()  # idempotent
 
 
-@pytest.mark.skipif(
-    "_loop" not in attrs.fields_dict(SyncFrameDecode),
-    reason="needs an ax253 with a per-instance event loop",
-)
 def test_tcpkiss_instances_in_threads(tnc):
     """Issue #12: two TCPKISS used from different threads at once."""
     servers = [tnc(), tnc()]
