@@ -1,10 +1,8 @@
 import pytest
-
 from ax253 import Frame
 
 from kiss import constants
-from kiss.util import getLogger, escape_special_codes
-
+from kiss.util import escape_special_codes, getLogger
 
 __author__ = "Greg Albrecht W2GMD <oss@undef.net>"
 __copyright__ = "Copyright 2017 Greg Albrecht and Contributors"
@@ -26,9 +24,7 @@ logger = getLogger(__name__)
 )
 @pytest.mark.parametrize("min_frames", [0, 1, 2, None])
 @pytest.mark.parametrize("strip_df_start", [True, False])
-def test_frame_split(
-    kiss_instance, data_buffer, exp_frames, min_frames, strip_df_start
-):
+def test_frame_split(kiss_instance, data_buffer, exp_frames, min_frames, strip_df_start):
     k = kiss_instance(data_buffer=data_buffer, strip_df_start=strip_df_start)
     if min_frames is not None:
         exp_frames = exp_frames[:min_frames]
@@ -90,7 +86,7 @@ def test_read_write_escape(kiss_instance, data, exp_data, direction):
         assert len(frames) == 1
         assert frames[0] == data
     else:
-        raise RuntimeError("Unknown direction: {}".format(direction))
+        raise RuntimeError(f"Unknown direction: {direction}")
 
 
 @pytest.mark.parametrize(

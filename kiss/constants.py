@@ -25,16 +25,16 @@ READ_BYTES = 1000
 # http://en.wikipedia.org/wiki/KISS_(TNC)#Special_Characters
 # http://k4kpk.com/content/notes-aprs-kiss-and-setting-tnc-x-igate-and-digipeater
 # Frames begin and end with a FEND/Frame End/0xC0 byte
-FEND = b"\xC0"  # Marks START and END of a Frame
-FESC = b"\xDB"  # Escapes FEND and FESC bytes within a frame
+FEND = b"\xc0"  # Marks START and END of a Frame
+FESC = b"\xdb"  # Escapes FEND and FESC bytes within a frame
 
 # Transpose Bytes: Used within a frame-
 # "Transpose FEND": An FEND after an FESC (within a frame)-
 # Sent as FESC TFEND
-TFEND = b"\xDC"
+TFEND = b"\xdc"
 # "Transpose FESC": An FESC after an FESC (within a frame)-
 # Sent as FESC TFESC
-TFESC = b"\xDD"
+TFESC = b"\xdd"
 
 # "FEND is sent as FESC, TFEND"
 # 0xC0 is sent as 0xDB 0xDC
@@ -53,7 +53,7 @@ SLOT_TIME = b"\x03"
 TX_TAIL = b"\x04"
 FULL_DUPLEX = b"\x05"
 SET_HARDWARE = b"\x06"
-RETURN = b"\xFF"
+RETURN = b"\xff"
 
 # Alternate convenience spellings for Command Codes
 # (these more closely match the names in the spec)
@@ -76,9 +76,9 @@ DEFAULT_KISS_CONFIG_VALUES = {
 KISS_ON = "KISS $0B"
 KISS_OFF = b"".join([FEND, RETURN, FEND, FEND])
 
-NMEA_HEADER = b"".join([FEND, b"\xF0", b"$"])
+NMEA_HEADER = b"".join([FEND, b"\xf0", b"$"])
 
 # AX.25 Protocol ID — This field is set to 0xf0 (no layer 3 protocol).
-NO_PROTOCOL_ID = b"\xF0"
+NO_PROTOCOL_ID = b"\xf0"
 # AX.25 Control Field — This field is set to 0x03 (UI-frame).
 UI_CONTROL_FIELD = b"\x03"

@@ -8,18 +8,18 @@ Python KISS Module.
 :license: Apache License, Version 2.0
 :source: <https://github.com/ampledata/kiss>
 """
+
 from importlib.metadata import version
 
-from .classes import SerialKISS, TCPKISS
+from .classes import TCPKISS, SerialKISS
 from .kiss import (
-    create_serial_connection,
-    create_tcp_connection,
+    AX25KISSDecode,
     Command,
     KISSDecode,
-    AX25KISSDecode,
     KISSProtocol,
+    create_serial_connection,
+    create_tcp_connection,
 )
-
 
 __author__ = "Greg Albrecht W2GMD <oss@undef.net>"
 __copyright__ = "Copyright 2017 Greg Albrecht and Contributors"

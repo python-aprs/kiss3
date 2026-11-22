@@ -1,22 +1,16 @@
 """asyncio Protocol for extracting individual KISS frames from a byte stream."""
+
 import asyncio
 import enum
 import functools
+from collections.abc import Awaitable, Callable, Iterable
 from typing import (
     Any,
-    Awaitable,
-    Callable,
-    Dict,
-    Iterable,
-    Optional,
-    Tuple,
     TypeVar,
-    Union,
 )
 
-from attrs import define, field
 import serial_asyncio
-
+from attrs import define, field
 from ax253 import Frame, FrameDecodeProtocol, GenericDecoder
 
 from . import util
@@ -45,7 +39,7 @@ class Command(enum.Enum):
     TX_TAIL = b"\x04"
     FULL_DUPLEX = b"\x05"
     SET_HARDWARE = b"\x06"
-    RETURN = b"\xFF"
+    RETURN = b"\xff"
 
 
 # pylint: enable=duplicate-code
@@ -105,8 +99,7 @@ class GenericKISSDecode(GenericDecoder[_T]):
         )
 
         for kiss_frame in filter(None, new_data.split(FEND)):
-            for decoded_frame in self.decode_frames(kiss_frame):
-                yield decoded_frame
+            yield from self.decode_frames(kiss_frame)
 
     def flush(self) -> Iterable[Frame]:
         """Call when the stream is closing to decode any final buffered bytes."""
@@ -154,7 +147,7 @@ class KISSProtocol(FrameDecodeProtocol[Frame]):
         frame_kiss = b"".join([FEND, command.value, frame_escaped, FEND])
         return self.transport.write(frame_kiss)
 
-    def write_setting(self, name: Command, value: Union[bytes, int]) -> None:
+    def write_setting(self, name: Command, value: bytes | int) -> None:
         """
         Writes KISS Command Codes to attached device.
 
@@ -172,7 +165,7 @@ class KISSProtocol(FrameDecodeProtocol[Frame]):
             command=name,
         )
 
-    def write_settings(self, settings: Dict[Command, bytes]):
+    def write_settings(self, settings: dict[Command, bytes]):
         """Write a dictionary of settings."""
         for name, value in settings.items():
             self.write_setting(name, value)
@@ -187,27 +180,27 @@ class KISSProtocol(FrameDecodeProtocol[Frame]):
 
 
 def _handle_kwargs(
-    protocol_kwargs: Dict[str, Any],
-    create_connection_kwargs: Dict[str, Any],
-    **kwargs: Any
-) -> Dict[str, Any]:
+    protocol_kwargs: dict[str, Any],
+    create_connection_kwargs: dict[str, Any],
+    **kwargs: Any,
+) -> dict[str, Any]:
     """Handle async connection kwarg combination to avoid duplication."""
     if create_connection_kwargs is None:
         create_connection_kwargs = {}
     create_connection_kwargs.update(kwargs)
     create_connection_kwargs["protocol_factory"] = functools.partial(
         create_connection_kwargs.pop("protocol_factory", KISSProtocol),
-        **(protocol_kwargs or {})
+        **(protocol_kwargs or {}),
     )
     return create_connection_kwargs
 
 
 async def _generic_create_connection(
-    f: Callable[..., Awaitable[Tuple[asyncio.Transport, KISSProtocol]]],
+    f: Callable[..., Awaitable[tuple[asyncio.Transport, KISSProtocol]]],
     args: Iterable[Any],
-    kwargs: Dict[str, Any],
-    kiss_settings: Dict[Command, bytes],
-) -> Tuple[asyncio.Transport, KISSProtocol]:
+    kwargs: dict[str, Any],
+    kiss_settings: dict[Command, bytes],
+) -> tuple[asyncio.Transport, KISSProtocol]:
     """Create a generic KISS connection and apply settings."""
     transport, protocol = await f(*args, **kwargs)
     if kiss_settings:
@@ -219,11 +212,11 @@ async def _generic_create_connection(
 async def create_tcp_connection(  # pylint: disable=too-many-arguments
     host,
     port,
-    protocol_kwargs: Optional[Dict[str, Any]] = None,
-    loop: Optional[asyncio.BaseEventLoop] = None,
-    create_connection_kwargs: Optional[Dict[str, Any]] = None,
-    kiss_settings: Optional[Dict[Command, bytes]] = None,
-) -> Tuple[asyncio.Transport, KISSProtocol]:
+    protocol_kwargs: dict[str, Any] | None = None,
+    loop: asyncio.BaseEventLoop | None = None,
+    create_connection_kwargs: dict[str, Any] | None = None,
+    kiss_settings: dict[Command, bytes] | None = None,
+) -> tuple[asyncio.Transport, KISSProtocol]:
     """
     Establish an async KISS-over-TCP connection.
 
@@ -254,11 +247,11 @@ async def create_tcp_connection(  # pylint: disable=too-many-arguments
 async def create_serial_connection(  # pylint: disable=too-many-arguments
     port: str,
     baudrate: int,
-    protocol_kwargs: Optional[Dict[str, Any]] = None,
-    loop: Optional[asyncio.BaseEventLoop] = None,
-    create_connection_kwargs: Optional[Dict[str, Any]] = None,
-    kiss_settings: Optional[Dict[Command, bytes]] = None,
-) -> Tuple[asyncio.Transport, KISSProtocol]:
+    protocol_kwargs: dict[str, Any] | None = None,
+    loop: asyncio.BaseEventLoop | None = None,
+    create_connection_kwargs: dict[str, Any] | None = None,
+    kiss_settings: dict[Command, bytes] | None = None,
+) -> tuple[asyncio.Transport, KISSProtocol]:
     """
     Establish an async Serial KISS connection.
 

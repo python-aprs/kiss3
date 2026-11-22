@@ -1,14 +1,13 @@
 import io
-from pathlib import Path
 import random
+from pathlib import Path
 
 import pytest
-
 from ax253 import Address, Frame
 
-from kiss import kiss, SerialKISS, TCPKISS
-from .constants import ALPHANUM, TEST_FRAMES
+from kiss import TCPKISS, SerialKISS, kiss
 
+from .constants import ALPHANUM, TEST_FRAMES
 
 __author__ = "Masen Furer KF7HVM <kf7hvm@0x26.net>"
 __copyright__ = "Copyright 2022 Masen Furer and Contributors"
@@ -61,7 +60,7 @@ def kiss_instance(request, monkeypatch):
         elif request.param is SerialKISS:
             k = SerialKISS("/dev/foo", "9600", **kwargs)
         else:
-            raise RuntimeError("Unexpected KISS class: {!r}".format(request.param))
+            raise RuntimeError(f"Unexpected KISS class: {request.param!r}")
         transport, protocol = k.loop.run_until_complete(make_mock_connection(k))
         if data_buffer:
             transport.data_received_callback(data_buffer)

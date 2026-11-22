@@ -4,11 +4,12 @@ Send a test frame via TCP, then read & print KISS frames from a TCP Socket.
 
 For use with programs like Dire Wolf.
 """
+
 import os
 
 from ax253 import Frame
-import kiss
 
+import kiss
 
 MYCALL = os.environ.get("MYCALL", "N0CALL")
 KISS_HOST = os.environ.get("KISS_HOST", "localhost")

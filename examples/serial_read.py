@@ -27,18 +27,19 @@ Test output should be as follows:
     WB2OSZ-15>TEST:,The quick brown fox jumps over the lazy dog!  4 of 4
 
 """
+
 import os
 
 import ax253
-import kiss
 
+import kiss
 
 KISS_SERIAL = os.environ.get("KISS_SERIAL", "/dev/cu.Repleo-PL2303-00303114")
 KISS_SPEED = os.environ.get("KISS_SPEED", "9600")
 
 
 def print_frame(frame):
-    print((ax253.Frame.from_bytes(frame)))
+    print(ax253.Frame.from_bytes(frame))
 
 
 def main():
