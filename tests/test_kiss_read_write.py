@@ -25,6 +25,12 @@ logger = getLogger(__name__)
 @pytest.mark.parametrize("min_frames", [0, 1, 2, None])
 @pytest.mark.parametrize("strip_df_start", [True, False])
 def test_frame_split(kiss_instance, data_buffer, exp_frames, min_frames, strip_df_start):
+    if strip_df_start:
+        # every KISS frame starts with a command byte; 0x00 = data, port 0
+        data_buffer = constants.FEND.join(
+            constants.DATA_FRAME + f if f else f
+            for f in data_buffer.split(constants.FEND)
+        )
     k = kiss_instance(data_buffer=data_buffer, strip_df_start=strip_df_start)
     if min_frames is not None:
         exp_frames = exp_frames[:min_frames]
@@ -40,7 +46,10 @@ def test_frame_split(kiss_instance, data_buffer, exp_frames, min_frames, strip_d
 
 
 def test_read_write_read_frame(kiss_instance, sample_frame):
-    rk = kiss_instance(data_buffer=sample_frame, strip_df_start=True)
+    # test_frames.log holds bare AX.25 frames; add the KISS data command byte
+    rk = kiss_instance(
+        data_buffer=constants.DATA_FRAME + sample_frame, strip_df_start=True
+    )
     frames = rk.read()
     assert len(frames) == 1
     wk = kiss_instance()

@@ -1,9 +1,10 @@
+import asyncio
 import io
 import random
 from pathlib import Path
 
 import pytest
-from ax253 import Address, Frame
+from ax253 import Address, Frame, SyncFrameDecode
 
 from kiss import TCPKISS, SerialKISS, kiss
 
@@ -12,6 +13,20 @@ from .constants import ALPHANUM, TEST_FRAMES
 __author__ = "Masen Furer KF7HVM <kf7hvm@0x26.net>"
 __copyright__ = "Copyright 2022 Masen Furer and Contributors"
 __license__ = "Apache License, Version 2.0"
+
+
+@pytest.fixture(autouse=True)
+def _current_event_loop():
+    """
+    Protocols create an asyncio.Future on construction, which needs a current
+    event loop. Since Python 3.14 there is none by default, and asyncio.run()
+    in another test clears it, so install the loop the sync classes share.
+    """
+    loop = SyncFrameDecode._loop
+    if loop is None or loop.is_closed():
+        loop = SyncFrameDecode._loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    yield
 
 
 class MockTransport:
@@ -83,11 +98,11 @@ def sample_frame(request, sample_frames):
 @pytest.fixture
 def payload_frame():
     frame = Frame(
-        destination=Address.from_str(random_alphanum(6)),
-        source=Address.from_str(random_alphanum(6)),
+        destination=Address.from_str(random_alphanum(6).upper()),
+        source=Address.from_str(random_alphanum(6).upper()),
         path=[
-            Address.from_str(random_alphanum(6)),
-            Address.from_str(random_alphanum(6), a7_hldc=True),
+            Address.from_str(random_alphanum(6).upper()),
+            Address.from_str(random_alphanum(6).upper(), a7_hldc=True),
         ],
         info=" ".join(
             [random_alphanum(), "this is the data for the frame", random_alphanum()]
