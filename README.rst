@@ -36,15 +36,47 @@ Read & print frames from a TNC connected to '/dev/ttyUSB0' at 1200 baud::
     k.start()  # inits the TNC, optionally passes KISS config flags.
     k.read(callback=p)  # reads frames and passes them to `p`.
 
+By default each frame is returned as raw KISS payload, still starting with
+the KISS command byte (``0x00`` for data on port 0). To decode frames with
+``ax253``, pass ``strip_df_start=True`` so the command byte is removed and
+non-data frames are dropped::
+
+    import ax253
+    import kiss
+
+    k = kiss.SerialKISS('/dev/ttyUSB0', 1200, strip_df_start=True)
+    k.start()
+    for raw in k.read(min_frames=1):
+        print(ax253.Frame.from_bytes(raw))
+
+Without it, ``ax253.Frame.from_bytes()`` fails with an error like
+``b'\x00VE3YC' does not match ...`` (often seen with Kenwood TNCs).
+
+Detecting a lost connection
+---------------------------
+``k.read(min_frames=None)`` blocks until the connection closes, then returns
+the frames that were left. Check ``k.connected`` (needs the ax253 release after 0.2.0a0) to
+tell a closed connection from a quiet one, and call ``stop()`` and
+``start()`` to reconnect::
+
+    while True:
+        k.read(callback=p, min_frames=None)
+        if not k.connected:
+            k.stop()
+            k.start()
+
+A TCP peer that disappears without closing the connection (network cable
+pulled, host crashed) is only noticed when a write fails or the operating
+system's TCP keepalive gives up.
 
 See also: examples/ directory.
 
 
 Testing
 =======
-Run tox::
+Run the tests with uv::
 
-    tox
+    uv run pytest
 
 
 See Also

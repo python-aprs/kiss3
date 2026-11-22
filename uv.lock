@@ -300,7 +300,6 @@ source = { editable = "." }
 dependencies = [
     { name = "attrs" },
     { name = "ax253" },
-    { name = "bitarray" },
     { name = "pyserial-asyncio" },
 ]
 
@@ -317,7 +316,6 @@ dev = [
 requires-dist = [
     { name = "attrs", specifier = ">20" },
     { name = "ax253", specifier = ">=0.2.0a0" },
-    { name = "bitarray", specifier = ">2.5.0" },
     { name = "pyserial-asyncio", specifier = ">=0.6" },
 ]
 

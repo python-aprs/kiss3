@@ -7,8 +7,9 @@ import socket
 import threading
 import time
 
+import attrs
 import pytest
-from ax253 import Frame
+from ax253 import Frame, SyncFrameDecode
 
 from kiss import TCPKISS, SerialKISS, kiss, util
 from kiss.constants import FEND, KISS_ON
@@ -93,6 +94,40 @@ def test_tcpkiss_stop_closes_connection(tnc):
     k.stop()
     assert server.peer_closed.wait(2)
     k.stop()  # idempotent
+
+
+@pytest.mark.skipif(
+    "_loop" not in attrs.fields_dict(SyncFrameDecode),
+    reason="needs an ax253 with a per-instance event loop",
+)
+def test_tcpkiss_instances_in_threads(tnc):
+    """Issue #12: two TCPKISS used from different threads at once."""
+    servers = [tnc(), tnc()]
+    results, errors = {}, []
+    started = threading.Barrier(2)
+
+    def work(server):
+        try:
+            k = TCPKISS("127.0.0.1", server.port, strip_df_start=True)
+            k.start()
+            started.wait(5)  # both loops exist before either reads
+            try:
+                results[server.port] = k.read(min_frames=1)
+            finally:
+                k.stop()
+        except Exception as exc:  # noqa: BLE001
+            errors.append(exc)
+
+    threads = [threading.Thread(target=work, args=(s,)) for s in servers]
+    for t in threads:
+        t.start()
+    time.sleep(0.2)  # both threads are now blocked in read()
+    for s in servers:
+        s.conn.sendall(KISS_FRAME)
+    for t in threads:
+        t.join(10)
+    assert errors == []
+    assert results == {s.port: [AX25] for s in servers}
 
 
 def test_create_tcp_connection_with_settings(tnc):

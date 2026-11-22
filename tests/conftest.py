@@ -4,7 +4,7 @@ import random
 from pathlib import Path
 
 import pytest
-from ax253 import Address, Frame, SyncFrameDecode
+from ax253 import Address, Frame
 
 from kiss import TCPKISS, SerialKISS, kiss
 
@@ -20,13 +20,13 @@ def _current_event_loop():
     """
     Protocols create an asyncio.Future on construction, which needs a current
     event loop. Since Python 3.14 there is none by default, and asyncio.run()
-    in another test clears it, so install the loop the sync classes share.
+    in another test clears it, so install a fresh one for each test.
     """
-    loop = SyncFrameDecode._loop
-    if loop is None or loop.is_closed():
-        loop = SyncFrameDecode._loop = asyncio.new_event_loop()
+    loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     yield
+    asyncio.set_event_loop(None)
+    loop.close()
 
 
 class MockTransport:
