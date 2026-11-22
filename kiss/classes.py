@@ -49,6 +49,22 @@ class KISS(SyncFrameDecode):
                 "%d bytes still queued after %ss", get_size(), self.drain_timeout
             )
 
+    def _close_transport(self) -> None:
+        """
+        Close the connection and let the event loop finish closing it.
+
+        asyncio transports release the socket or serial port on the next loop
+        iteration after close(). A synchronous caller's loop only runs inside
+        its calls, so without this the TNC saw the connection stay open until
+        the next read() or write(), or until the process exited.
+        """
+        if self._protocol is None or self._protocol.transport is None:
+            return
+        self._protocol.transport.close()
+        loop = SyncFrameDecode._loop
+        if loop is not None and not loop.is_running() and not loop.is_closed():
+            loop.run_until_complete(asyncio.sleep(0))
+
     def write(self, frame: SupportsBytes) -> None:
         """Write a frame to the TNC and wait for it to be sent."""
         self.protocol.write(frame)
@@ -87,8 +103,7 @@ class TCPKISS(KISS):
         self.address = (host, int(port))
 
     def stop(self) -> None:
-        if self._protocol is not None and self._protocol.transport is not None:
-            self._protocol.transport.close()
+        self._close_transport()
 
     def start(self, **kwargs: Any) -> None:
         """
@@ -130,8 +145,7 @@ class SerialKISS(KISS):
         self._drain()
 
     def stop(self) -> None:
-        if self._protocol is not None and self._protocol.transport is not None:
-            self._protocol.transport.close()
+        self._close_transport()
 
     def start_no_config(self) -> None:
         """

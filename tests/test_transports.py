@@ -26,6 +26,7 @@ class TNCServer:
         self.send = send
         self.received = b""
         self.conn = None
+        self.peer_closed = threading.Event()
         self.thread = threading.Thread(target=self._serve, daemon=True)
         self.thread.start()
 
@@ -38,6 +39,7 @@ class TNCServer:
             except OSError:
                 break
             if not data:
+                self.peer_closed.set()
                 break
             self.received += data
 
@@ -80,6 +82,17 @@ def test_tcpkiss_read_write_settings(tnc):
         assert server.wait_for(len(expected)) == expected
     finally:
         k.stop()
+
+
+def test_tcpkiss_stop_closes_connection(tnc):
+    """The TNC sees the close when stop() returns, without another loop run."""
+    server = tnc(send=KISS_FRAME)
+    k = TCPKISS("127.0.0.1", server.port, strip_df_start=True)
+    k.start()
+    assert k.read(min_frames=1) == [AX25]
+    k.stop()
+    assert server.peer_closed.wait(2)
+    k.stop()  # idempotent
 
 
 def test_create_tcp_connection_with_settings(tnc):
@@ -143,6 +156,27 @@ def test_serialkiss_over_pty(pty_pair):
         assert _read_fd(controller, 4) == FEND + b"\xff" + FEND + FEND
     finally:
         k.stop()
+
+
+def _open_fds(path):
+    fds = []
+    for fd in os.listdir("/proc/self/fd"):
+        with contextlib.suppress(OSError):
+            if os.readlink(f"/proc/self/fd/{fd}") == path:
+                fds.append(fd)
+    return len(fds)
+
+
+def test_serialkiss_stop_releases_port(pty_pair):
+    if not os.path.isdir("/proc/self/fd"):
+        pytest.skip("needs /proc to count open file descriptors")
+    _, device = pty_pair
+    before = _open_fds(device)
+    k = SerialKISS(device, "9600", strip_df_start=True)
+    k.start_no_config()
+    assert _open_fds(device) == before + 1
+    k.stop()
+    assert _open_fds(device) == before
 
 
 def test_util_helpers(sample_frames):
