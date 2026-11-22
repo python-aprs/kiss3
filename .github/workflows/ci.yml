@@ -33,5 +33,7 @@ jobs:
     - uses: astral-sh/setup-uv@v6
       with:
         python-version: ${{ matrix.python-version }}
+    - name: Install Dire Wolf (live interop tests)
+      run: sudo apt-get update && sudo apt-get install -y direwolf
     - run: uv sync --locked
     - run: uv run pytest

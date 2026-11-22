@@ -1,6 +1,7 @@
 """Python KISS Module Class Definitions."""
 
-from typing import Any
+import asyncio
+from typing import Any, SupportsBytes
 
 from ax253 import SyncFrameDecode
 
@@ -21,6 +22,38 @@ class KISS(SyncFrameDecode):
         super().__init__()
         self.decoder = self.decode_class(strip_df_start=strip_df_start)
 
+    #: seconds to wait for queued output to reach the device in write()
+    drain_timeout: float = 5.0
+
+    def _drain(self) -> None:
+        """
+        Run the event loop until the transport's write buffer is empty.
+
+        asyncio transports (serial in particular) only send data while the
+        event loop runs. Without this, a synchronous caller's writes sat in
+        the buffer until the next read(), or were lost at exit.
+        """
+        transport = self.protocol.transport
+        get_size = getattr(transport, "get_write_buffer_size", None)
+        if get_size is None or self.loop.is_running():
+            return
+
+        async def _wait() -> None:
+            while get_size() > 0 and not transport.is_closing():
+                await asyncio.sleep(0.005)
+
+        try:
+            self.loop.run_until_complete(asyncio.wait_for(_wait(), self.drain_timeout))
+        except TimeoutError:
+            self._logger.warning(
+                "%d bytes still queued after %ss", get_size(), self.drain_timeout
+            )
+
+    def write(self, frame: SupportsBytes) -> None:
+        """Write a frame to the TNC and wait for it to be sent."""
+        self.protocol.write(frame)
+        self._drain()
+
     def write_setting(self, name: str, value: bytes | int) -> None:
         """
         Writes KISS Command Codes to attached device.
@@ -32,7 +65,8 @@ class KISS(SyncFrameDecode):
         """
         self._logger.debug("Configuring %s=%s", name, repr(value))
 
-        return self.protocol.write_setting(getattr(kiss.Command, name), value)
+        self.protocol.write_setting(getattr(kiss.Command, name), value)
+        self._drain()
 
     def _write_defaults(self, **kwargs: Any) -> None:
         """
@@ -53,7 +87,8 @@ class TCPKISS(KISS):
         self.address = (host, int(port))
 
     def stop(self) -> None:
-        self.protocol.transport.close()
+        if self._protocol is not None and self._protocol.transport is not None:
+            self._protocol.transport.close()
 
     def start(self, **kwargs: Any) -> None:
         """
@@ -87,13 +122,16 @@ class SerialKISS(KISS):
     def kiss_on(self) -> None:
         """Turns KISS ON."""
         self.protocol.kiss_on()
+        self._drain()
 
     def kiss_off(self) -> None:
         """Turns KISS OFF."""
         self.protocol.kiss_off()
+        self._drain()
 
     def stop(self) -> None:
-        self.protocol.transport.close()
+        if self._protocol is not None and self._protocol.transport is not None:
+            self._protocol.transport.close()
 
     def start_no_config(self) -> None:
         """

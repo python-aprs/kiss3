@@ -14,7 +14,9 @@ from attrs import define, field
 from ax253 import Frame, FrameDecodeProtocol, GenericDecoder
 
 from . import util
-from .constants import FEND, KISS_OFF, KISS_ON
+from .constants import DATA_FRAME, FEND, KISS_OFF, KISS_ON
+
+NMEA_START = b"\xf0"
 
 __author__ = "Masen Furer KF7HVM <kf7hvm@0x26.net>"
 __copyright__ = "Copyright 2022 Masen Furer and Contributors"
@@ -45,19 +47,36 @@ class Command(enum.Enum):
 # pylint: enable=duplicate-code
 
 
-def handle_fend(buffer: bytes, strip_df_start: bool = True) -> bytes:
+def handle_fend(buffer: bytes, strip_df_start: bool = True) -> bytes | None:
     """
     Handle FEND (end of frame) encountered in a KISS data stream.
 
     :param buffer: the buffer containing the frame
-    :param strip_df_start: remove leading null byte (DATA_FRAME opcode)
+    :param strip_df_start: remove the leading command byte. Data frames for
+        any KISS port (command byte 0x00, 0x10, ... 0xF0) are returned
+        without it; frames carrying any other command (TNC parameter
+        echoes, SetHardware replies, 0xFF return) are not data and return
+        None.
     :return: the bytes of the frame without escape characters or frame
-             end markers (FEND)
+             end markers (FEND), or None if the frame is not a data frame
     """
-    frame = util.recover_special_codes(util.strip_nmea(bytes(buffer)))
+    buffer = bytes(buffer)
+    if buffer[:1] == NMEA_START:
+        # T3-Micro style NMEA passthrough
+        return bytes(util.recover_special_codes(util.strip_nmea(buffer)))
+    frame = bytes(util.recover_special_codes(buffer))
     if strip_df_start:
-        frame = util.strip_df_start(frame)
-    return bytes(frame)
+        if not frame:
+            return None
+        if frame[0] & 0x0F != DATA_FRAME[0]:
+            log.debug("Ignore non-data KISS command frame %r", frame)
+            return None
+        # exactly one command byte: the AX.25 frame itself may end in
+        # 0x00, spaces, CR or LF, all of which are significant
+        frame = frame[1:]
+        if not frame:
+            return None
+    return frame
 
 
 _T = TypeVar("_T")
@@ -81,7 +100,9 @@ class GenericKISSDecode(GenericDecoder[_T]):
         self,
         frame: bytes,
     ) -> Iterable[_T]:
-        yield handle_fend(frame, strip_df_start=self.strip_df_start)
+        decoded = handle_fend(frame, strip_df_start=self.strip_df_start)
+        if decoded is not None:
+            yield decoded
 
     def update(self, new_data: bytes) -> Iterable[_T]:
         trail_data_from = new_data.rfind(FEND)
@@ -160,10 +181,8 @@ class KISSProtocol(FrameDecodeProtocol[Frame]):
         if isinstance(value, int):
             value = bytes([value])
 
-        return self.write(
-            util.escape_special_codes(value),
-            command=name,
-        )
+        # write() escapes FEND/FESC; escaping here too would double-escape
+        return self.write(value, command=name)
 
     def write_settings(self, settings: dict[Command, bytes]):
         """Write a dictionary of settings."""

@@ -73,7 +73,7 @@ DEFAULT_KISS_CONFIG_VALUES = {
     "FULL_DUPLEX": 0,
 }
 
-KISS_ON = "KISS $0B"
+KISS_ON = b"KISS $0B"
 KISS_OFF = b"".join([FEND, RETURN, FEND, FEND])
 
 NMEA_HEADER = b"".join([FEND, b"\xf0", b"$"])
