@@ -1,6 +1,6 @@
 """Python KISS Module Class Definitions."""
 
-from typing import Any, Union
+from typing import Any
 
 from ax253 import SyncFrameDecode
 
@@ -21,7 +21,7 @@ class KISS(SyncFrameDecode):
         super().__init__()
         self.decoder = self.decode_class(strip_df_start=strip_df_start)
 
-    def write_setting(self, name: str, value: Union[bytes, int]) -> None:
+    def write_setting(self, name: str, value: bytes | int) -> None:
         """
         Writes KISS Command Codes to attached device.
 

@@ -2,11 +2,12 @@
 """
 Send KISS frames to a Serial TNC.
 """
+
 import os
 
 from ax253 import Frame
-import kiss
 
+import kiss
 
 MYCALL = os.environ.get("MYCALL", "N0CALL")
 KISS_SERIAL = os.environ.get("KISS_SERIAL", "/dev/cu.Repleo-PL2303-00303114")

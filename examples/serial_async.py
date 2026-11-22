@@ -5,7 +5,6 @@ import os
 
 import kiss
 
-
 MYCALL = os.environ.get("MYCALL", "N0CALL")
 KISS_SERIAL = os.environ.get("KISS_SERIAL", "/dev/ttyUSB0")
 KISS_SPEED = os.environ.get("KISS_SPEED", "9600")
