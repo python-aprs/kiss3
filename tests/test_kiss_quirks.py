@@ -4,6 +4,8 @@ examples: multi-port TNCs, parameter echoes, banners before KISS mode,
 significant trailing bytes, malformed escapes.
 """
 
+import asyncio
+
 import pytest
 from ax253 import Frame
 
@@ -128,8 +130,9 @@ def test_nmea_passthrough():
     assert decode(FEND + b"\xf0" + sentence + b"\r\n" + FEND) == [sentence]
 
 
-class _Transport:
+class _Transport(asyncio.Transport):
     def __init__(self):
+        super().__init__()
         self.data = b""
 
     def write(self, data):

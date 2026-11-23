@@ -63,7 +63,7 @@ async def make_mock_connection(kiss_instance=None):
 @pytest.fixture
 def dummy_serialkiss():
     ks = SerialKISS(port=random_alphanum(), speed="9600", strip_df_start=True)
-    ks.transport, ks.protocol = ks.loop.run_until_complete(make_mock_connection(ks))
+    _, ks.protocol = ks.loop.run_until_complete(make_mock_connection(ks))
     return ks
 
 

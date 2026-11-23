@@ -63,6 +63,7 @@ def main() -> int:
             else:
                 raise RuntimeError("Dire Wolf KISS port did not open")
             time.sleep(0.5)
+            assert dw.stdin is not None
             dw.stdin.write(bytes(audio))
             dw.stdin.flush()
             client.settimeout(0.5)
@@ -79,7 +80,8 @@ def main() -> int:
                     break
                 stream += data
         finally:
-            dw.stdin.close()
+            if dw.stdin is not None:
+                dw.stdin.close()
             dw.wait(10)
     (HERE / "direwolf_kiss_tcp.bin").write_bytes(stream)
     print(f"wrote {len(stream)} bytes")

@@ -19,7 +19,7 @@ def main():
         destination="PYKISS",
         source=MYCALL,
         path=["WIDE1-1"],
-        info=">Hello World!",
+        info=b">Hello World!",
     )
 
     ki = kiss.SerialKISS(port=KISS_SERIAL, speed=KISS_SPEED)
