@@ -96,6 +96,26 @@ def test_tcpkiss_stop_closes_connection(tnc):
     k.stop()  # idempotent
 
 
+def test_tcpkiss_stop_inside_another_loop(tnc, recwarn):
+    """
+    stop() from a coroutine (or __del__ during garbage collection there)
+    can't run this instance's loop; it must not raise or leave a never
+    awaited coroutine, and the close completes when the loop next runs.
+    """
+    server = tnc()  # unread data would make the close a reset
+    k = TCPKISS("127.0.0.1", server.port, strip_df_start=True)
+    k.start()
+
+    async def stop_from_coroutine():
+        k.stop()
+        k.stop()
+
+    asyncio.run(stop_from_coroutine())
+    assert not [w for w in recwarn if issubclass(w.category, RuntimeWarning)]
+    k.loop.run_until_complete(asyncio.sleep(0))
+    assert server.peer_closed.wait(2)
+
+
 def test_tcpkiss_instances_in_threads(tnc):
     """Issue #12: two TCPKISS used from different threads at once."""
     servers = [tnc(), tnc()]
