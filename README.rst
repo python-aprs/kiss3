@@ -4,106 +4,133 @@ kiss3 - Python KISS Module
 .. image:: https://github.com/python-aprs/kiss3/actions/workflows/pytest.yml/badge.svg
     :target: https://github.com/python-aprs/kiss3/actions
 
-kiss3 is a Python Module that implements the
-`KISS Protocol <https://en.wikipedia.org/wiki/KISS_(TNC)>`_ for
-communicating with KISS-enabled devices (such as Serial or TCP TNCs)
-and provides support for encoding and decoding AX.25 frames.
+kiss3 talks `KISS <https://en.wikipedia.org/wiki/KISS_(TNC)>`_ to TNCs
+over serial ports and TCP (Dire Wolf, hardware TNCs, Bluetooth TNCs), with
+plain blocking calls or asyncio. It frames and unframes AX.25 data and sends
+TNC parameters. It needs Python 3.11 or newer.
 
-Versions
-========
+Install it from PyPI::
 
-- 8.x branch from ``python-aprs`` as ``kiss3``, supports python 3.6+
+    pip install kiss3
 
-Previous versions were released by ``ampledata`` as ``kiss``:
+For APRS decoding on top of KISS, use `aprs3 <https://github.com/python-aprs/aprs3>`_.
 
-- 7.x.x branch and-on will be Python 3.x ONLY.
-- 6.5.x branch will be the last version of this Module that supports Python 2.7.x
+Sending and receiving
+=====================
 
-Installation
-============
-Install from pypi using pip: ``pip install kiss3``
+``TCPKISS`` and ``SerialKISS`` block. ``start()`` connects and writes any
+TNC parameters you pass, ``write()`` returns once the frame has gone out,
+and ``read()`` waits for frames:
 
+.. code-block:: python
 
-Usage Examples
-==============
-Read & print frames from a TNC connected to '/dev/ttyUSB0' at 1200 baud::
+    from ax253 import Frame
 
     import kiss
 
-    def p(x): print(x)  # prints whatever is passed in.
+    tnc = kiss.TCPKISS("localhost", 8001, strip_df_start=True)  # Dire Wolf
+    # or: kiss.SerialKISS("/dev/ttyUSB0", 9600, strip_df_start=True)
+    tnc.start(TX_DELAY=40)
+    try:
+        tnc.write(Frame.from_str("N0CALL>APRS,WIDE1-1:>on the air"))
+        for raw in tnc.read(min_frames=1):
+            print(Frame.from_bytes(raw))
+    finally:
+        tnc.stop()
 
-    k = kiss.SerialKISS('/dev/ttyUSB0', 1200)
-    k.start()  # inits the TNC, optionally passes KISS config flags.
-    k.read(callback=p)  # reads frames and passes them to `p`.
+``strip_df_start=True`` removes the KISS command byte and drops frames that
+aren't data. Without it, each frame still starts with the command byte
+(``0x00`` for data on port 0) and ``Frame.from_bytes()`` fails with an error
+like ``b'\x00VE3YC' does not match ...``.
 
-By default each frame is returned as raw KISS payload, still starting with
-the KISS command byte (``0x00`` for data on port 0). To decode frames with
-``ax253``, pass ``strip_df_start=True`` so the command byte is removed and
-non-data frames are dropped::
+With asyncio, ``create_tcp_connection`` and ``create_serial_connection``
+return a ``KISSProtocol`` whose ``read()`` yields ``ax253.Frame`` objects:
 
-    import ax253
+.. code-block:: python
+
+    import asyncio
+
     import kiss
 
-    k = kiss.SerialKISS('/dev/ttyUSB0', 1200, strip_df_start=True)
-    k.start()
-    for raw in k.read(min_frames=1):
-        print(ax253.Frame.from_bytes(raw))
 
-Without it, ``ax253.Frame.from_bytes()`` fails with an error like
-``b'\x00VE3YC' does not match ...`` (often seen with Kenwood TNCs).
+    async def main():
+        transport, protocol = await kiss.create_tcp_connection("localhost", 8001)
+        async for frame in protocol.read():
+            print(frame)
+
+
+    asyncio.run(main())
+
+Decoding a byte stream
+======================
+
+If you read the bytes yourself, the decoders turn them into frames as they
+arrive:
+
+>>> from ax253 import Frame
+>>> import kiss
+>>> stream = b"\xc0\x00" + bytes(Frame.from_str("N0CALL>APRS:>hi")) + b"\xc0"
+>>> decoder = kiss.AX25KISSDecode()
+>>> list(decoder.update(stream[:10]))
+[]
+>>> [str(frame) for frame in decoder.update(stream[10:])]
+['N0CALL>APRS:>hi']
 
 Detecting a lost connection
----------------------------
-``k.read(min_frames=None)`` blocks until the connection closes, then returns
-the frames that were left. Check ``k.connected`` to
-tell a closed connection from a quiet one, and call ``stop()`` and
-``start()`` to reconnect::
+===========================
+
+``read(min_frames=None)`` blocks until the connection closes, then returns
+the frames that were left. Check ``connected`` to tell a closed connection
+from a quiet one, and call ``stop()`` and ``start()`` to reconnect:
+
+.. code-block:: python
 
     while True:
-        k.read(callback=p, min_frames=None)
-        if not k.connected:
-            k.stop()
-            k.start()
+        tnc.read(callback=print, min_frames=None)
+        if not tnc.connected:
+            tnc.stop()
+            tnc.start()
 
 A TCP peer that disappears without closing the connection (network cable
 pulled, host crashed) is only noticed when a write fails or the operating
 system's TCP keepalive gives up.
 
-See also: examples/ directory.
+Examples
+========
 
+The `examples <./examples>`_ directory has two scripts that work with any
+KISS TNC, given ``--tcp host:port`` or ``--serial device``:
+
+* ``kiss_monitor.py`` prints every frame the TNC hears.
+* ``kiss_send.py`` sends frames given in TNC2 text, and can set TNC
+  parameters like ``--set TX_DELAY=40``.
+
+Versions
+========
+
+8.x is published by python-aprs as ``kiss3``. Earlier versions were released
+by Greg Albrecht as ``kiss``.
 
 Testing
 =======
-Run the tests with uv::
+
+Run the tests with `uv <https://docs.astral.sh/uv/>`_::
 
     uv run pytest
 
-
-See Also
-========
-
-* `Python APRS Module <https://github.com/python-aprs/aprs3>`_ Library for sending, receiving and parsing APRS Frames to and from multiple Interfaces
-* `Python KISS Module <https://github.com/python-aprs/kiss3>`_ Handles interfacing-to and encoding-for various KISS Interfaces.
-* `Python APRS Gateway <https://github.com/ampledata/aprsgate>`_ Uses Redis PubSub to run a multi-interface APRS Gateway.
-* `Python APRS Tracker <https://github.com/ampledata/aprstracker>`_ TK.
-* `dirus <https://github.com/ampledata/dirus>`_ Dirus is a daemon for managing a SDR to Dire Wolf interface. Manifests that interface as a KISS TCP port.
-
-
-Similar Projects
+Related projects
 ================
 
-* `apex <https://github.com/Syncleus/apex>`_ by Jeffrey Phillips Freeman (WI2ARD). Next-Gen APRS Protocol. (based on this Module! :)
-* `aprslib <https://github.com/rossengeorgiev/aprs-python>`_ by Rossen Georgiev. A Python APRS Library with build-in parsers for several Frame types.
-* `aprx <http://thelifeofkenneth.com/aprx/>`_ by Matti & Kenneth. A C-based Digi/IGate Software for POSIX platforms.
-* `dixprs <https://sites.google.com/site/dixprs/>`_ by HA5DI. A Python APRS project with KISS, digipeater, et al., support.
-* `APRSDroid <http://aprsdroid.org/>`_ by GE0RG. A Java/Scala Android APRS App.
-* `YAAC <http://www.ka2ddo.org/ka2ddo/YAAC.html>`_ by KA2DDO. A Java APRS Client.
-* `Ham-APRS-FAP <http://search.cpan.org/dist/Ham-APRS-FAP/>`_ by aprs.fi: A Perl APRS Parser.
-* `Dire Wolf <https://github.com/wb2osz/direwolf>`_ by WB2OSZ. A C-Based Soft-TNC for interfacing with sound cards. Can present as a KISS interface!
+* `ax253 <https://github.com/python-aprs/ax253>`_, the AX.25 frames this
+  package carries.
+* `aprs3 <https://github.com/python-aprs/aprs3>`_, APRS encoding and decoding
+  over KISS and APRS-IS.
+* `Dire Wolf <https://github.com/wb2osz/direwolf>`_ by WB2OSZ, a sound card
+  TNC with a KISS interface.
 
 Source
 ======
-Github: https://github.com/ampledata/kiss
+GitHub: https://github.com/python-aprs/kiss3
 
 Authors
 =======

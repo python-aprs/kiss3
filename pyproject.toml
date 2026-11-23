@@ -66,12 +66,13 @@ ignore = [
 extend-safe-fixes = ["UP028"]
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+testpaths = ["tests", "kiss", "README.rst"]
 timeout = 30
-addopts = "--cov=kiss --cov-report=term-missing"
+addopts = "--cov=kiss --cov-report=term-missing --doctest-modules --doctest-glob=README.rst"
 
 [tool.coverage.report]
 fail_under = 95
 
 [tool.ty.environment]
 python-version = "3.11"
+extra-paths = ["examples"]
