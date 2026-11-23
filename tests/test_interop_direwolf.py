@@ -7,6 +7,7 @@ radio; see tests/fixtures/direwolf/generate.py. The ``live`` tests talk to
 a real ``direwolf`` process and are skipped when it is not installed.
 """
 
+import asyncio
 import json
 import pathlib
 import queue
@@ -82,7 +83,7 @@ def test_encode_matches_direwolf_framing():
 def test_protocol_write_matches_direwolf_framing():
     written = []
 
-    class Transport:
+    class Transport(asyncio.Transport):
         def write(self, data):
             written.append(data)
 
@@ -135,6 +136,7 @@ def direwolf_kiss():
             yield port, proc
         finally:
             if proc.poll() is None:
+                assert proc.stdin is not None
                 proc.stdin.close()
                 proc.terminate()
                 proc.wait(10)
@@ -172,7 +174,7 @@ def test_live_direwolf_transmits_kiss3_frames(direwolf_kiss):
     client = _connect(port, proc)
     protocol = kiss.KISSProtocol()
 
-    class Transport:
+    class Transport(asyncio.Transport):
         def write(self, data):
             client.sendall(data)
 

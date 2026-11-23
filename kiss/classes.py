@@ -2,7 +2,7 @@
 
 import asyncio
 import logging
-from typing import Any, SupportsBytes
+from typing import Any, SupportsBytes, cast
 
 from ax253 import SyncFrameDecode
 
@@ -13,7 +13,7 @@ __copyright__ = "Copyright 2017 Greg Albrecht and Contributors"
 __license__ = "Apache License, Version 2.0"
 
 
-class KISS(SyncFrameDecode):
+class KISS(SyncFrameDecode[Any]):
     """KISS Object representing a TNC."""
 
     decode_class = kiss.KISSDecode
@@ -22,6 +22,11 @@ class KISS(SyncFrameDecode):
     def __init__(self, strip_df_start: bool = False) -> None:
         super().__init__()
         self.decoder = self.decode_class(strip_df_start=strip_df_start)
+
+    @property
+    def kiss_protocol(self) -> kiss.KISSProtocol:
+        """The connection's protocol, for the KISS-specific writes."""
+        return cast(kiss.KISSProtocol, self.protocol)
 
     #: seconds to wait for queued output to reach the device in write()
     drain_timeout: float = 5.0
@@ -36,7 +41,7 @@ class KISS(SyncFrameDecode):
         """
         transport = self.protocol.transport
         get_size = getattr(transport, "get_write_buffer_size", None)
-        if get_size is None or self.loop.is_running():
+        if transport is None or get_size is None or self.loop.is_running():
             return
 
         async def _wait() -> None:
@@ -82,7 +87,7 @@ class KISS(SyncFrameDecode):
         """
         self._logger.debug("Configuring %s=%s", name, repr(value))
 
-        self.protocol.write_setting(getattr(kiss.Command, name), value)
+        self.kiss_protocol.write_setting(getattr(kiss.Command, name), value)
         self._drain()
 
     def _write_defaults(self, **kwargs: Any) -> None:
@@ -137,12 +142,12 @@ class SerialKISS(KISS):
 
     def kiss_on(self) -> None:
         """Turns KISS ON."""
-        self.protocol.kiss_on()
+        self.kiss_protocol.kiss_on()
         self._drain()
 
     def kiss_off(self) -> None:
         """Turns KISS OFF."""
-        self.protocol.kiss_off()
+        self.kiss_protocol.kiss_off()
         self._drain()
 
     def stop(self) -> None:

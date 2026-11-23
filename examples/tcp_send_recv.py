@@ -27,7 +27,7 @@ def main():
         destination="PYKISS",
         source=MYCALL,
         path=["WIDE1-1"],
-        info=">Hello World!",
+        info=b">Hello World!",
     )
     ki.write(frame)
     ki.read(callback=print_frame, min_frames=None)

@@ -144,6 +144,32 @@ def test_create_tcp_connection_with_settings(tnc):
     assert server.wait_for(4) == FEND + b"\x04\x03" + FEND
 
 
+def test_create_connection_kwargs_are_not_modified(tnc):
+    """The caller's create_connection_kwargs can be reused for a reconnect."""
+    server = tnc()
+    options = {"ssl": None}
+
+    async def main():
+        for _ in range(2):
+            transport, _ = await kiss.create_tcp_connection(
+                "127.0.0.1", server.port, create_connection_kwargs=options
+            )
+            transport.close()
+
+    asyncio.run(main())
+    assert options == {"ssl": None}
+
+
+def test_write_before_connection_raises():
+    async def main():
+        protocol = kiss.KISSProtocol()
+        for write in (lambda: protocol.write(AX25), protocol.kiss_on):
+            with pytest.raises(ConnectionError):
+                write()
+
+    asyncio.run(main())
+
+
 @pytest.fixture
 def pty_pair():
     pytest.importorskip("termios")
@@ -245,7 +271,7 @@ def test_serialkiss_kiss_on(pty_pair):
 
 
 def test_drain_timeout_logs_and_returns(caplog):
-    class StuckTransport:
+    class StuckTransport(asyncio.Transport):
         def write(self, data):
             pass
 
