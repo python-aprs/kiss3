@@ -241,8 +241,10 @@ async def _generic_create_connection(
 ) -> tuple[asyncio.Transport, KISSProtocol]:
     """Create a generic KISS connection and apply settings."""
     transport, protocol = await f(*args, **kwargs)
+    # the serial transport calls connection_made() on a later loop iteration;
+    # wait for it so the caller can write as soon as this returns
+    await protocol.connection_future
     if kiss_settings:
-        await protocol.connection_future
         protocol.write_settings(kiss_settings)
     return transport, protocol
 
