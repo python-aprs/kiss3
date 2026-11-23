@@ -96,6 +96,26 @@ def test_tcpkiss_stop_closes_connection(tnc):
     k.stop()  # idempotent
 
 
+def test_tcpkiss_stop_inside_another_loop(tnc, recwarn):
+    """
+    stop() from a coroutine (or __del__ during garbage collection there)
+    can't run this instance's loop; it must not raise or leave a never
+    awaited coroutine, and the close completes when the loop next runs.
+    """
+    server = tnc()  # unread data would make the close a reset
+    k = TCPKISS("127.0.0.1", server.port, strip_df_start=True)
+    k.start()
+
+    async def stop_from_coroutine():
+        k.stop()
+        k.stop()
+
+    asyncio.run(stop_from_coroutine())
+    assert not [w for w in recwarn if issubclass(w.category, RuntimeWarning)]
+    k.loop.run_until_complete(asyncio.sleep(0))
+    assert server.peer_closed.wait(2)
+
+
 def test_tcpkiss_instances_in_threads(tnc):
     """Issue #12: two TCPKISS used from different threads at once."""
     servers = [tnc(), tnc()]
@@ -142,6 +162,32 @@ def test_create_tcp_connection_with_settings(tnc):
     frames = asyncio.run(main())
     assert [bytes(f) for f in frames] == [AX25]
     assert server.wait_for(4) == FEND + b"\x04\x03" + FEND
+
+
+def test_create_connection_kwargs_are_not_modified(tnc):
+    """The caller's create_connection_kwargs can be reused for a reconnect."""
+    server = tnc()
+    options = {"ssl": None}
+
+    async def main():
+        for _ in range(2):
+            transport, _ = await kiss.create_tcp_connection(
+                "127.0.0.1", server.port, create_connection_kwargs=options
+            )
+            transport.close()
+
+    asyncio.run(main())
+    assert options == {"ssl": None}
+
+
+def test_write_before_connection_raises():
+    async def main():
+        protocol = kiss.KISSProtocol()
+        for write in (lambda: protocol.write(AX25), protocol.kiss_on):
+            with pytest.raises(ConnectionError):
+                write()
+
+    asyncio.run(main())
 
 
 @pytest.fixture
@@ -245,7 +291,7 @@ def test_serialkiss_kiss_on(pty_pair):
 
 
 def test_drain_timeout_logs_and_returns(caplog):
-    class StuckTransport:
+    class StuckTransport(asyncio.Transport):
         def write(self, data):
             pass
 

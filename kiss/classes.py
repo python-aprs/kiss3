@@ -2,7 +2,7 @@
 
 import asyncio
 import logging
-from typing import Any, SupportsBytes
+from typing import Any, SupportsBytes, cast
 
 from ax253 import SyncFrameDecode
 
@@ -11,6 +11,14 @@ from . import constants, kiss
 __author__ = "Greg Albrecht W2GMD <oss@undef.net>"
 __copyright__ = "Copyright 2017 Greg Albrecht and Contributors"
 __license__ = "Apache License, Version 2.0"
+
+
+def _loop_running_in_this_thread() -> bool:
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        return False
+    return True
 
 
 class KISS(SyncFrameDecode):
@@ -22,6 +30,11 @@ class KISS(SyncFrameDecode):
     def __init__(self, strip_df_start: bool = False) -> None:
         super().__init__()
         self.decoder = self.decode_class(strip_df_start=strip_df_start)
+
+    @property
+    def kiss_protocol(self) -> kiss.KISSProtocol:
+        """The connection's protocol, for the KISS-specific writes."""
+        return cast(kiss.KISSProtocol, self.protocol)
 
     #: seconds to wait for queued output to reach the device in write()
     drain_timeout: float = 5.0
@@ -36,7 +49,7 @@ class KISS(SyncFrameDecode):
         """
         transport = self.protocol.transport
         get_size = getattr(transport, "get_write_buffer_size", None)
-        if get_size is None or self.loop.is_running():
+        if transport is None or get_size is None or self.loop.is_running():
             return
 
         async def _wait() -> None:
@@ -61,10 +74,18 @@ class KISS(SyncFrameDecode):
         """
         if self._protocol is None or self._protocol.transport is None:
             return
-        self._protocol.transport.close()
+        transport = self._protocol.transport
+        if transport.is_closing():
+            return  # already stopped (e.g. stop() and then __del__)
+        transport.close()
         loop = self.loop
-        if loop is not None and not loop.is_running() and not loop.is_closed():
-            loop.run_until_complete(asyncio.sleep(0))
+        if loop is None or loop.is_running() or loop.is_closed():
+            return
+        if _loop_running_in_this_thread():
+            # e.g. stop() (or __del__) from inside a coroutine: this loop can't
+            # run here, so it finishes closing the next time it runs
+            return
+        loop.run_until_complete(asyncio.sleep(0))
 
     def write(self, frame: SupportsBytes) -> None:
         """Write a frame to the TNC and wait for it to be sent."""
@@ -82,7 +103,7 @@ class KISS(SyncFrameDecode):
         """
         self._logger.debug("Configuring %s=%s", name, repr(value))
 
-        self.protocol.write_setting(getattr(kiss.Command, name), value)
+        self.kiss_protocol.write_setting(getattr(kiss.Command, name), value)
         self._drain()
 
     def _write_defaults(self, **kwargs: Any) -> None:
@@ -137,12 +158,12 @@ class SerialKISS(KISS):
 
     def kiss_on(self) -> None:
         """Turns KISS ON."""
-        self.protocol.kiss_on()
+        self.kiss_protocol.kiss_on()
         self._drain()
 
     def kiss_off(self) -> None:
         """Turns KISS OFF."""
-        self.protocol.kiss_off()
+        self.kiss_protocol.kiss_off()
         self._drain()
 
     def stop(self) -> None:

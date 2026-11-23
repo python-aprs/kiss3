@@ -4,10 +4,12 @@ import asyncio
 import enum
 import functools
 import logging
-from collections.abc import Awaitable, Callable, Iterable
+from collections.abc import Awaitable, Callable, Iterable, Mapping
 from typing import (
     Any,
+    SupportsBytes,
     TypeVar,
+    cast,
 )
 
 import serial_asyncio
@@ -100,13 +102,19 @@ class GenericKISSDecode(GenericDecoder[_T]):
     strip_df_start: bool = field(default=True)
     _last_pframe: bytes = field(default=b"", init=False)
 
+    def _deframe(self, frame: bytes) -> Iterable[bytes]:
+        """The data frame's payload, with the KISS framing removed."""
+        decoded = handle_fend(frame, strip_df_start=self.strip_df_start)
+        if decoded is not None:
+            yield decoded
+
     def decode_frames(  # pylint: disable=arguments-differ
         self,
         frame: bytes,
     ) -> Iterable[_T]:
-        decoded = handle_fend(frame, strip_df_start=self.strip_df_start)
-        if decoded is not None:
-            yield decoded
+        # the payload bytes themselves; subclasses with another _T override this
+        for payload in self._deframe(frame):
+            yield cast(_T, payload)
 
     def update(self, new_data: bytes) -> Iterable[_T]:
         trail_data_from = new_data.rfind(FEND)
@@ -126,7 +134,7 @@ class GenericKISSDecode(GenericDecoder[_T]):
         for kiss_frame in filter(None, new_data.split(FEND)):
             yield from self.decode_frames(kiss_frame)
 
-    def flush(self) -> Iterable[Frame]:
+    def flush(self) -> Iterable[_T]:
         """Call when the stream is closing to decode any final buffered bytes."""
         if self._last_pframe:
             yield from self.decode_frames(self._last_pframe)
@@ -148,7 +156,7 @@ class AX25KISSDecode(GenericKISSDecode[Frame]):
     """
 
     def decode_frames(self, frame: bytes) -> Iterable[Frame]:
-        for kiss_frame in super().decode_frames(frame):
+        for kiss_frame in self._deframe(frame):
             try:
                 yield Frame.from_bytes(kiss_frame)
             except Exception:  # pylint: disable=broad-except
@@ -159,9 +167,16 @@ class AX25KISSDecode(GenericKISSDecode[Frame]):
 class KISSProtocol(FrameDecodeProtocol[Frame]):
     """A protocol for encoding and decoding KISS frames."""
 
-    decoder: AX25KISSDecode = field(factory=AX25KISSDecode)
+    decoder: GenericDecoder[Frame] = field(factory=AX25KISSDecode)
 
-    def write(self, frame: bytes, command: Command = Command.DATA_FRAME) -> None:
+    def _transport(self) -> asyncio.Transport:
+        if self.transport is None:
+            raise ConnectionError("not connected: the transport isn't open yet")
+        return self.transport
+
+    def write(
+        self, frame: SupportsBytes | bytes, command: Command = Command.DATA_FRAME
+    ) -> None:
         """
         Write the framed bytes to the transport.
 
@@ -170,7 +185,7 @@ class KISSProtocol(FrameDecodeProtocol[Frame]):
         """
         frame_escaped = util.escape_special_codes(bytes(frame))
         frame_kiss = b"".join([FEND, command.value, frame_escaped, FEND])
-        return self.transport.write(frame_kiss)
+        self._transport().write(frame_kiss)
 
     def write_setting(self, name: Command, value: bytes | int) -> None:
         """
@@ -186,30 +201,30 @@ class KISSProtocol(FrameDecodeProtocol[Frame]):
             value = bytes([value])
 
         # write() escapes FEND/FESC; escaping here too would double-escape
-        return self.write(value, command=name)
+        self.write(value, command=name)
 
-    def write_settings(self, settings: dict[Command, bytes]):
+    def write_settings(self, settings: Mapping[Command, bytes | int]) -> None:
         """Write a dictionary of settings."""
         for name, value in settings.items():
             self.write_setting(name, value)
 
     def kiss_on(self) -> None:
         """Turns KISS ON."""
-        self.transport.write(KISS_ON)
+        self._transport().write(KISS_ON)
 
     def kiss_off(self) -> None:
         """Turns KISS OFF."""
-        self.transport.write(KISS_OFF)
+        self._transport().write(KISS_OFF)
 
 
 def _handle_kwargs(
-    protocol_kwargs: dict[str, Any],
-    create_connection_kwargs: dict[str, Any],
+    protocol_kwargs: dict[str, Any] | None,
+    create_connection_kwargs: dict[str, Any] | None,
     **kwargs: Any,
 ) -> dict[str, Any]:
     """Handle async connection kwarg combination to avoid duplication."""
-    if create_connection_kwargs is None:
-        create_connection_kwargs = {}
+    # a copy: the caller's dict must not collect host/port/protocol_factory
+    create_connection_kwargs = dict(create_connection_kwargs or {})
     create_connection_kwargs.update(kwargs)
     create_connection_kwargs["protocol_factory"] = functools.partial(
         create_connection_kwargs.pop("protocol_factory", KISSProtocol),
@@ -222,7 +237,7 @@ async def _generic_create_connection(
     f: Callable[..., Awaitable[tuple[asyncio.Transport, KISSProtocol]]],
     args: Iterable[Any],
     kwargs: dict[str, Any],
-    kiss_settings: dict[Command, bytes],
+    kiss_settings: Mapping[Command, bytes | int] | None,
 ) -> tuple[asyncio.Transport, KISSProtocol]:
     """Create a generic KISS connection and apply settings."""
     transport, protocol = await f(*args, **kwargs)
@@ -238,9 +253,9 @@ async def create_tcp_connection(  # pylint: disable=too-many-arguments
     host,
     port,
     protocol_kwargs: dict[str, Any] | None = None,
-    loop: asyncio.BaseEventLoop | None = None,
+    loop: asyncio.AbstractEventLoop | None = None,
     create_connection_kwargs: dict[str, Any] | None = None,
-    kiss_settings: dict[Command, bytes] | None = None,
+    kiss_settings: Mapping[Command, bytes | int] | None = None,
 ) -> tuple[asyncio.Transport, KISSProtocol]:
     """
     Establish an async KISS-over-TCP connection.
@@ -248,14 +263,14 @@ async def create_tcp_connection(  # pylint: disable=too-many-arguments
     :param host: the host to connect to
     :param port: the TCP port to connect to
     :param protocol_kwargs: These kwargs are passed directly to KISSProtocol
-    :param loop: override the asyncio event loop (default calls `get_event_loop()`)
+    :param loop: override the asyncio event loop (default: the running loop)
     :param create_connection_kwargs: These kwargs are passed directly to
         loop.create_connection
     :param kiss_settings: dictionary of (Command, bytes) pairs to send after connecting
     :return: (TCPTransport, KISSProtocol)
     """
     if loop is None:
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
     return await _generic_create_connection(
         loop.create_connection,
         args=tuple(),
@@ -273,9 +288,9 @@ async def create_serial_connection(  # pylint: disable=too-many-arguments
     port: str,
     baudrate: int,
     protocol_kwargs: dict[str, Any] | None = None,
-    loop: asyncio.BaseEventLoop | None = None,
+    loop: asyncio.AbstractEventLoop | None = None,
     create_connection_kwargs: dict[str, Any] | None = None,
-    kiss_settings: dict[Command, bytes] | None = None,
+    kiss_settings: Mapping[Command, bytes | int] | None = None,
 ) -> tuple[asyncio.Transport, KISSProtocol]:
     """
     Establish an async Serial KISS connection.
@@ -283,14 +298,14 @@ async def create_serial_connection(  # pylint: disable=too-many-arguments
     :param port: the serial port device (platform dependent)
     :param baudrate: serial port speed
     :param protocol_kwargs: These kwargs are passed directly to KISSProtocol
-    :param loop: override the asyncio event loop (default calls `get_event_loop()`)
+    :param loop: override the asyncio event loop (default: the running loop)
     :param create_connection_kwargs: These kwargs are passed directly to
         loop.create_connection
     :param kiss_settings: dictionary of (Command, bytes) pairs to send after connecting
     :return: (SerialTransport, KISSProtocol)
     """
     if loop is None:
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
     kwargs = _handle_kwargs(
         protocol_kwargs=protocol_kwargs,
         create_connection_kwargs=create_connection_kwargs,
