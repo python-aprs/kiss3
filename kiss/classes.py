@@ -13,6 +13,14 @@ __copyright__ = "Copyright 2017 Greg Albrecht and Contributors"
 __license__ = "Apache License, Version 2.0"
 
 
+def _loop_running_in_this_thread() -> bool:
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        return False
+    return True
+
+
 class KISS(SyncFrameDecode):
     """KISS Object representing a TNC."""
 
@@ -61,10 +69,18 @@ class KISS(SyncFrameDecode):
         """
         if self._protocol is None or self._protocol.transport is None:
             return
-        self._protocol.transport.close()
+        transport = self._protocol.transport
+        if transport.is_closing():
+            return  # already stopped (e.g. stop() and then __del__)
+        transport.close()
         loop = self.loop
-        if loop is not None and not loop.is_running() and not loop.is_closed():
-            loop.run_until_complete(asyncio.sleep(0))
+        if loop is None or loop.is_running() or loop.is_closed():
+            return
+        if _loop_running_in_this_thread():
+            # e.g. stop() (or __del__) from inside a coroutine: this loop can't
+            # run here, so it finishes closing the next time it runs
+            return
+        loop.run_until_complete(asyncio.sleep(0))
 
     def write(self, frame: SupportsBytes) -> None:
         """Write a frame to the TNC and wait for it to be sent."""
