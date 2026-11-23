@@ -13,7 +13,7 @@ __copyright__ = "Copyright 2017 Greg Albrecht and Contributors"
 __license__ = "Apache License, Version 2.0"
 
 
-class KISS(SyncFrameDecode[Any]):
+class KISS(SyncFrameDecode):
     """KISS Object representing a TNC."""
 
     decode_class = kiss.KISSDecode
