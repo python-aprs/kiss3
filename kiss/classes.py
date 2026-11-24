@@ -87,12 +87,17 @@ class KISS(SyncFrameDecode):
             return
         loop.run_until_complete(asyncio.sleep(0))
 
-    def write(self, frame: SupportsBytes) -> None:
-        """Write a frame to the TNC and wait for it to be sent."""
-        self.protocol.write(frame)
+    def write(self, frame: SupportsBytes, port: int | None = None) -> None:
+        """
+        Write a frame to the TNC and wait for it to be sent.
+
+        :param port: the KISS port (0-15). None uses the port a received
+            `KISSFrame` came in on, and port 0 for anything else.
+        """
+        self.kiss_protocol.write(frame, port=port)
         self._drain()
 
-    def write_setting(self, name: str, value: bytes | int) -> None:
+    def write_setting(self, name: str, value: bytes | int, port: int = 0) -> None:
         """
         Writes KISS Command Codes to attached device.
 
@@ -100,10 +105,11 @@ class KISS(SyncFrameDecode):
 
         :param name: KISS Command Code Name as a string.
         :param value: KISS Command Code Value to write.
+        :param port: the KISS port (0-15) the setting applies to
         """
-        self._logger.debug("Configuring %s=%s", name, repr(value))
+        self._logger.debug("Configuring %s=%s on port %d", name, repr(value), port)
 
-        self.kiss_protocol.write_setting(getattr(kiss.Command, name), value)
+        self.kiss_protocol.write_setting(getattr(kiss.Command, name), value, port=port)
         self._drain()
 
     def _write_defaults(self, **kwargs: Any) -> None:

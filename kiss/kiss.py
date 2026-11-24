@@ -7,6 +7,7 @@ import logging
 from collections.abc import Awaitable, Callable, Iterable, Mapping
 from typing import (
     Any,
+    Self,
     SupportsBytes,
     TypeVar,
     cast,
@@ -70,19 +71,82 @@ def handle_fend(buffer: bytes, strip_df_start: bool = True) -> bytes | None:
     if buffer[:2] == NMEA_SENTENCE_START:
         # T3-Micro style NMEA passthrough
         return bytes(util.recover_special_codes(util.strip_nmea(buffer)))
-    frame = bytes(util.recover_special_codes(buffer))
-    if strip_df_start:
-        if not frame:
-            return None
-        if frame[0] & 0x0F != DATA_FRAME[0]:
-            log.debug("Ignore non-data KISS command frame %r", frame)
-            return None
-        # exactly one command byte: the AX.25 frame itself may end in
-        # 0x00, spaces, CR or LF, all of which are significant
-        frame = frame[1:]
-        if not frame:
-            return None
-    return frame
+    if not strip_df_start:
+        return bytes(util.recover_special_codes(buffer))
+    split = split_data_frame(buffer)
+    if split is None:
+        log.debug("Ignore non-data KISS command frame %r", buffer)
+        return None
+    return split[1]
+
+
+MAX_PORT = 15
+"""KISS ports are numbered 0-15: the high nibble of the command byte."""
+
+
+def _valid_port(port: int) -> int:
+    if not 0 <= port <= MAX_PORT:
+        raise ValueError(f"KISS port must be 0-{MAX_PORT}, got {port!r}")
+    return port
+
+
+def command_byte(command: "Command", port: int = 0) -> bytes:
+    """
+    The KISS command byte for ``command`` on ``port``.
+
+    >>> command_byte(Command.DATA_FRAME, port=1)
+    b'\\x10'
+    >>> command_byte(Command.TX_DELAY, port=2)
+    b'!'
+    """
+    if command is Command.RETURN:
+        if port:
+            raise ValueError("RETURN (0xFF) has no port")
+        return command.value
+    return bytes([_valid_port(port) << 4 | command.value[0]])
+
+
+def split_data_frame(buffer: bytes) -> tuple[int, bytes] | None:
+    """
+    Split an escaped KISS frame (between two FENDs) into its port and payload.
+
+    :return: ``(port, payload)`` for a data frame on any port, or None for
+        other commands (TNC parameter echoes, SetHardware replies, RETURN)
+        and for empty frames.
+
+    >>> split_data_frame(b"\\x10hello")
+    (1, b'hello')
+    >>> split_data_frame(b"\\x01\\x32") is None  # TX_DELAY echo
+    True
+    """
+    frame = bytes(util.recover_special_codes(bytes(buffer)))
+    if len(frame) < 2 or frame[0] & 0x0F != DATA_FRAME[0]:
+        return None
+    # exactly one command byte: the AX.25 frame itself may end in 0x00,
+    # spaces, CR or LF, all of which are significant
+    return frame[0] >> 4, frame[1:]
+
+
+@define(frozen=True, slots=True)
+class KISSFrame(Frame):
+    """
+    An AX.25 frame received over KISS, with the KISS port it arrived on.
+
+    Multi-port TNCs and Dire Wolf with several radio channels number their
+    ports 0-15. ``KISSProtocol.write`` sends a ``KISSFrame`` back out of the
+    same port unless another port is given.
+    """
+
+    port: int = field(default=0, kw_only=True, validator=lambda i, a, v: _valid_port(v))
+
+    @classmethod
+    def from_bytes(cls, ax25_bytes: bytes, port: int = 0) -> Self:
+        """Decode the frame from AX.25 bytes received on KISS ``port``."""
+        frame = super().from_bytes(ax25_bytes)
+        # Frame.from_bytes builds the instance; set the port without a
+        # second __init__ (frames are decoded on the hot path)
+        object.__setattr__(frame, "port", _valid_port(port))
+        return frame
 
 
 _T = TypeVar("_T")
@@ -100,13 +164,42 @@ class GenericKISSDecode(GenericDecoder[_T]):
     """
 
     strip_df_start: bool = field(default=True)
+    ports: frozenset[int] | None = field(
+        default=None,
+        converter=lambda v: None if v is None else frozenset(_valid_port(p) for p in v),
+        kw_only=True,
+    )
+    """
+    Only decode data frames received on these KISS ports; None (the default)
+    decodes every port. Ignored when ``strip_df_start`` is False.
+    """
     _last_pframe: bytes = field(default=b"", init=False)
+
+    def _deframe_with_port(self, frame: bytes) -> Iterable[tuple[int, bytes]]:
+        """The data frame's KISS port and payload, with the framing removed."""
+        if not self.strip_df_start:
+            decoded = handle_fend(frame, strip_df_start=False)
+            if decoded is not None:
+                yield 0, decoded
+            return
+        if frame[:2] == NMEA_SENTENCE_START:
+            # T3-Micro NMEA passthrough has no port
+            decoded = handle_fend(frame)
+            if decoded is not None:
+                yield 0, decoded
+            return
+        split = split_data_frame(frame)
+        if split is None:
+            log.debug("Ignore non-data KISS command frame %r", frame)
+            return
+        if self.ports is not None and split[0] not in self.ports:
+            return
+        yield split
 
     def _deframe(self, frame: bytes) -> Iterable[bytes]:
         """The data frame's payload, with the KISS framing removed."""
-        decoded = handle_fend(frame, strip_df_start=self.strip_df_start)
-        if decoded is not None:
-            yield decoded
+        for _, payload in self._deframe_with_port(frame):
+            yield payload
 
     def decode_frames(  # pylint: disable=arguments-differ
         self,
@@ -148,26 +241,34 @@ class KISSDecode(GenericKISSDecode[bytes]):
     """
 
 
-class AX25KISSDecode(GenericKISSDecode[Frame]):
+class AX25KISSDecode(GenericKISSDecode[KISSFrame]):
     """
     Stateful AX25 framing decoder.
 
-    Decoded frames are `ax253.Frame` objects
+    Decoded frames are `KISSFrame` objects: `ax253.Frame` plus the KISS port.
     """
 
-    def decode_frames(self, frame: bytes) -> Iterable[Frame]:
-        for kiss_frame in self._deframe(frame):
+    def decode_frames(self, frame: bytes) -> Iterable[KISSFrame]:
+        for port, kiss_frame in self._deframe_with_port(frame):
             try:
-                yield Frame.from_bytes(kiss_frame)
+                yield KISSFrame.from_bytes(kiss_frame, port=port)
             except Exception:  # pylint: disable=broad-except
                 log.debug("Ignore frame AX.25 decode error %r", frame, exc_info=True)
 
 
 @define
 class KISSProtocol(FrameDecodeProtocol[Frame]):
-    """A protocol for encoding and decoding KISS frames."""
+    """
+    A protocol for encoding and decoding KISS frames.
 
-    decoder: GenericDecoder[Frame] = field(factory=AX25KISSDecode)
+    With the default decoder, ``read()`` yields `KISSFrame` objects, so
+    ``frame.port`` is the KISS port each frame arrived on.
+    """
+
+    # GenericDecoder is invariant; the frames are still Frame instances
+    decoder: GenericDecoder[Frame] = field(
+        factory=lambda: cast(GenericDecoder[Frame], AX25KISSDecode())
+    )
 
     def _transport(self) -> asyncio.Transport:
         if self.transport is None:
@@ -175,19 +276,26 @@ class KISSProtocol(FrameDecodeProtocol[Frame]):
         return self.transport
 
     def write(
-        self, frame: SupportsBytes | bytes, command: Command = Command.DATA_FRAME
+        self,
+        frame: SupportsBytes | bytes,
+        command: Command = Command.DATA_FRAME,
+        port: int | None = None,
     ) -> None:
         """
         Write the framed bytes to the transport.
 
         :param frame: any bytes-able object that can be sent via KISS
         :param command: kiss Command to send with the frame, default is 0x00 (DATA)
+        :param port: the KISS port (0-15) to send on. None uses the port a
+            received `KISSFrame` came in on, and port 0 for anything else.
         """
+        if port is None:
+            port = getattr(frame, "port", 0)
         frame_escaped = util.escape_special_codes(bytes(frame))
-        frame_kiss = b"".join([FEND, command.value, frame_escaped, FEND])
+        frame_kiss = b"".join([FEND, command_byte(command, port), frame_escaped, FEND])
         self._transport().write(frame_kiss)
 
-    def write_setting(self, name: Command, value: bytes | int) -> None:
+    def write_setting(self, name: Command, value: bytes | int, port: int = 0) -> None:
         """
         Writes KISS Command Codes to attached device.
 
@@ -195,18 +303,21 @@ class KISSProtocol(FrameDecodeProtocol[Frame]):
 
         :param name: KISS Command Code enum
         :param value: KISS Command Code Value to write.
+        :param port: the KISS port (0-15) the setting applies to
         """
         # Do the reasonable thing if a user passes an int
         if isinstance(value, int):
             value = bytes([value])
 
         # write() escapes FEND/FESC; escaping here too would double-escape
-        self.write(value, command=name)
+        self.write(value, command=name, port=port)
 
-    def write_settings(self, settings: Mapping[Command, bytes | int]) -> None:
-        """Write a dictionary of settings."""
+    def write_settings(
+        self, settings: Mapping[Command, bytes | int], port: int = 0
+    ) -> None:
+        """Write a dictionary of settings to one KISS port."""
         for name, value in settings.items():
-            self.write_setting(name, value)
+            self.write_setting(name, value, port=port)
 
     def kiss_on(self) -> None:
         """Turns KISS ON."""
