@@ -27,14 +27,26 @@ Connecting
     finally:
         tnc.stop()
 
-``create_tcp_connection`` and ``create_serial_connection`` return an asyncio
-``KISSProtocol`` whose ``read()`` yields decoded ``ax253.Frame`` objects:
+``connect_tcp`` and ``connect_serial`` give an asyncio ``KISSProtocol``
+whose ``read()`` yields decoded ``ax253.Frame`` objects; ``async with``
+closes the connection at the end:
 
 .. code-block:: python
 
-    transport, protocol = await kiss.create_tcp_connection("localhost", 8001)
-    async for frame in protocol.read():
-        print(frame)
+    async with kiss.connect_tcp("localhost", 8001, settings={"TX_DELAY": 30}) as tnc:
+        tnc.set_persistence(63)
+        async for frame in tnc.read():
+            print(frame)
+
+``tnc = await kiss.connect_tcp(...)`` works too, with ``await tnc.close()``.
+``create_tcp_connection`` and ``create_serial_connection`` are the lower-level
+versions, returning ``(transport, protocol)``.
+
+``encode_frame`` wraps bytes in KISS framing, for simulators and bridges:
+
+>>> import kiss
+>>> kiss.encode_frame(b"a\xc0b")
+b'\xc0\x00a\xdb\xdcb\xc0'
 
 Decoding a stream
 =================
@@ -70,8 +82,11 @@ from .kiss import (
     Command,
     KISSDecode,
     KISSProtocol,
+    connect_serial,
+    connect_tcp,
     create_serial_connection,
     create_tcp_connection,
+    encode_frame,
 )
 
 __author__ = "Greg Albrecht W2GMD <oss@undef.net>"
@@ -84,6 +99,9 @@ __version__ = version(__distribution__)
 logging.getLogger(__name__).addHandler(logging.NullHandler())
 __all__ = [
     "AX25KISSDecode",
+    "connect_serial",
+    "connect_tcp",
+    "encode_frame",
     "create_serial_connection",
     "create_tcp_connection",
     "Command",
