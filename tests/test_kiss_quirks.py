@@ -106,7 +106,13 @@ def test_unterminated_final_frame_dropped_on_flush():
 
 
 def test_truncated_message_not_delivered():
-    full = bytes(Frame.ui("APRS", "N0CALL", [], b":KF7HVM   :meet at 5pm at the gate{12"))
+    full = bytes(
+        Frame.ui(
+            destination="APRS",
+            source="N0CALL",
+            info=b":KF7HVM   :meet at 5pm at the gate{12",
+        )
+    )
     d = kiss.AX25KISSDecode()
     assert list(d.update(FEND + b"\x00" + full[:-15])) == []
     assert list(d.flush()) == []
