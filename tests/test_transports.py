@@ -365,3 +365,42 @@ def test_serialkiss_baudrate_and_deprecated_speed():
     with pytest.warns(DeprecationWarning):
         k = SerialKISS("/dev/null", speed="1200")
     assert k.baudrate == k.speed == 1200
+
+
+# --- kiss3#32: connect_tcp / close ---
+
+
+def test_connect_tcp_async_with_closes(tnc):
+    server = tnc(send=KISS_FRAME)
+
+    async def main():
+        async with kiss.connect_tcp(
+            "127.0.0.1", server.port, settings={"TX_TAIL": 3}
+        ) as tnc_:
+            frames = [f async for f in tnc_.read(n_frames=1)]
+            tnc_.set_tx_delay(300)
+        return frames, tnc_
+
+    frames, protocol = asyncio.run(main())
+    assert [bytes(f) for f in frames] == [AX25]
+    assert protocol.transport.is_closing()
+    assert server.peer_closed.wait(5)
+    assert server.received == FEND + b"\x04\x03" + FEND + FEND + b"\x01\x1e" + FEND
+
+
+def test_connect_tcp_await_then_close(tnc):
+    server = tnc()
+
+    async def main():
+        protocol = await kiss.connect_tcp("127.0.0.1", server.port)
+        protocol.write(AX25)
+        await protocol.close()
+        await protocol.close()  # idempotent
+
+    asyncio.run(main())
+    assert server.peer_closed.wait(5)
+    assert server.received == KISS_FRAME
+
+
+def test_protocol_close_before_connect_is_a_noop():
+    asyncio.run(kiss.KISSProtocol().close())

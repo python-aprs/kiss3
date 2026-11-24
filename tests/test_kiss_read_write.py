@@ -1,6 +1,7 @@
 import pytest
 from ax253 import Frame
 
+import kiss
 from kiss import constants
 from kiss.util import escape_special_codes, getLogger
 
@@ -182,3 +183,52 @@ def test_sync_read_strips_command_byte_by_default(kiss_instance):
     (raw,) = k.read()
     assert raw == payload
     assert str(Frame.from_bytes(raw)) == "N0CALL>APRS:>hi"
+
+
+# --- kiss3#31: settings by Command or name, named setters in real units ---
+
+
+@pytest.mark.parametrize(
+    "name", [kiss.Command.TX_DELAY, "TX_DELAY", "tx_delay"], ids=["enum", "name", "lower"]
+)
+def test_write_setting_accepts_command_or_name(kiss_instance, name):
+    k = kiss_instance()
+    k.write_setting(name, 30)
+    assert (
+        k.protocol.transport.buffer.getvalue()
+        == constants.FEND + b"\x01\x1e" + constants.FEND
+    )
+
+
+def test_write_setting_rejects_unknown_name_and_range(kiss_instance):
+    k = kiss_instance()
+    with pytest.raises(ValueError, match="not a KISS command"):
+        k.write_setting("TXDELAY_TYPO", 30)
+    with pytest.raises(ValueError, match="0-255"):
+        k.write_setting("TX_DELAY", 300)
+
+
+@pytest.mark.parametrize(
+    "setter,arg,sent",
+    [
+        ("set_tx_delay", 300, b"\x01\x1e"),  # 300 ms = 30 x 10 ms
+        ("set_tx_delay", 5000, b"\x01\xff"),  # clamped
+        ("set_persistence", 63, b"\x02\x3f"),
+        ("set_slot_time", 100, b"\x03\x0a"),
+        ("set_tx_tail", 34, b"\x04\x03"),  # rounds to the nearest step
+        ("set_full_duplex", True, b"\x05\x01"),
+        ("set_full_duplex", False, b"\x05\x00"),
+    ],
+)
+def test_named_setters(kiss_instance, setter, arg, sent):
+    k = kiss_instance()
+    getattr(k, setter)(arg)
+    assert (
+        k.protocol.transport.buffer.getvalue() == constants.FEND + sent + constants.FEND
+    )
+
+
+def test_encode_frame_matches_write(kiss_instance):
+    k = kiss_instance()
+    k.write(b"a\xc0b\xdb")
+    assert k.protocol.transport.buffer.getvalue() == kiss.encode_frame(b"a\xc0b\xdb")

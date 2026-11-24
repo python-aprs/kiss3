@@ -93,19 +93,39 @@ class KISS(SyncFrameDecode):
         self.protocol.write(frame)
         self._drain()
 
-    def write_setting(self, name: str, value: bytes | int) -> None:
+    def write_setting(self, name: kiss.Setting, value: bytes | int) -> None:
         """
         Writes KISS Command Codes to attached device.
 
         http://en.wikipedia.org/wiki/KISS_(TNC)#Command_Codes
 
-        :param name: KISS Command Code Name as a string.
+        :param name: KISS Command Code, or its name as a string ("TX_DELAY").
         :param value: KISS Command Code Value to write.
         """
         self._logger.debug("Configuring %s=%s", name, repr(value))
 
-        self.kiss_protocol.write_setting(getattr(kiss.Command, name), value)
+        self.kiss_protocol.write_setting(name, value)
         self._drain()
+
+    def set_tx_delay(self, ms: float) -> None:
+        """Key-up delay before sending, in milliseconds (sent in 10 ms steps)."""
+        self.write_setting(kiss.Command.TX_DELAY, kiss.tenths_of_10ms(ms))
+
+    def set_persistence(self, p: int) -> None:
+        """CSMA persistence, 0-255: the chance (p+1)/256 of sending in a free slot."""
+        self.write_setting(kiss.Command.PERSISTENCE, p)
+
+    def set_slot_time(self, ms: float) -> None:
+        """CSMA slot time in milliseconds (sent in 10 ms steps)."""
+        self.write_setting(kiss.Command.SLOT_TIME, kiss.tenths_of_10ms(ms))
+
+    def set_tx_tail(self, ms: float) -> None:
+        """Time to hold the transmitter keyed after a frame, in milliseconds."""
+        self.write_setting(kiss.Command.TX_TAIL, kiss.tenths_of_10ms(ms))
+
+    def set_full_duplex(self, on: bool) -> None:
+        """Full duplex: transmit without waiting for a clear channel."""
+        self.write_setting(kiss.Command.FULL_DUPLEX, bool(on))
 
     def _write_defaults(self, **kwargs: Any) -> None:
         """
