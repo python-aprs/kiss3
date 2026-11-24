@@ -28,8 +28,8 @@ and ``read()`` waits for frames:
 
     import kiss
 
-    tnc = kiss.TCPKISS("localhost", 8001, strip_df_start=True)  # Dire Wolf
-    # or: kiss.SerialKISS("/dev/ttyUSB0", 9600, strip_df_start=True)
+    tnc = kiss.TCPKISS("localhost", 8001)  # Dire Wolf
+    # or: kiss.SerialKISS("/dev/ttyUSB0", baudrate=9600)
     tnc.start(TX_DELAY=40)
     try:
         tnc.write(Frame.from_str("N0CALL>APRS,WIDE1-1:>on the air"))
@@ -38,10 +38,10 @@ and ``read()`` waits for frames:
     finally:
         tnc.stop()
 
-``strip_df_start=True`` removes the KISS command byte and drops frames that
-aren't data. Without it, each frame still starts with the command byte
-(``0x00`` for data on port 0) and ``Frame.from_bytes()`` fails with an error
-like ``b'\x00VE3YC' does not match ...``.
+``read()`` returns each data frame's AX.25 bytes, without the KISS command
+byte, and drops frames that aren't data. Pass ``strip_df_start=False`` to get
+every frame with its command byte (``0x00`` for data on port 0); before
+kiss3 9.0 that was the default.
 
 With asyncio, ``create_tcp_connection`` and ``create_serial_connection``
 return a ``KISSProtocol`` whose ``read()`` yields ``ax253.Frame`` objects:

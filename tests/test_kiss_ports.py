@@ -139,3 +139,13 @@ def test_handle_fend_strips_any_port():
     assert kiss.kiss.handle_fend(b"\x30abc") == b"abc"
     assert kiss.kiss.handle_fend(b"\x31abc") is None
     assert kiss.kiss.handle_fend(b"\x30abc", strip_df_start=False) == b"\x30abc"
+
+
+def test_named_setter_on_port(kiss_instance):
+    k = kiss_instance()
+    k.set_tx_delay(400, port=1)
+    assert k.protocol.transport.buffer.getvalue() == b"\xc0\x11\x28\xc0"
+    protocol = kiss.KISSProtocol()
+    transport = MockTransport(protocol)
+    protocol.set_persistence(63, port=2)
+    assert transport.buffer.getvalue() == b"\xc0\x22\x3f\xc0"

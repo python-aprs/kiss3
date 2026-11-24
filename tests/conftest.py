@@ -62,7 +62,7 @@ async def make_mock_connection(kiss_instance=None):
 
 @pytest.fixture
 def dummy_serialkiss():
-    ks = SerialKISS(port=random_alphanum(), speed="9600", strip_df_start=True)
+    ks = SerialKISS(port=random_alphanum(), baudrate=9600)
     _, ks.protocol = ks.loop.run_until_complete(make_mock_connection(ks))
     return ks
 
@@ -73,7 +73,7 @@ def kiss_instance(request, monkeypatch):
         if request.param is TCPKISS:
             k = TCPKISS("localhost", 8001, **kwargs)
         elif request.param is SerialKISS:
-            k = SerialKISS("/dev/foo", "9600", **kwargs)
+            k = SerialKISS("/dev/foo", 9600, **kwargs)
         else:
             raise RuntimeError(f"Unexpected KISS class: {request.param!r}")
         transport, protocol = k.loop.run_until_complete(make_mock_connection(k))

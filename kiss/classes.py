@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+import warnings
 from typing import Any, SupportsBytes, cast
 
 from ax253 import SyncFrameDecode
@@ -27,7 +28,7 @@ class KISS(SyncFrameDecode):
     decode_class = kiss.KISSDecode
     _logger = logging.getLogger(__name__)
 
-    def __init__(self, strip_df_start: bool = False) -> None:
+    def __init__(self, strip_df_start: bool = True) -> None:
         super().__init__()
         self.decoder = self.decode_class(strip_df_start=strip_df_start)
 
@@ -97,20 +98,42 @@ class KISS(SyncFrameDecode):
         self.kiss_protocol.write(frame, port=port)
         self._drain()
 
-    def write_setting(self, name: str, value: bytes | int, port: int = 0) -> None:
+    def write_setting(
+        self, name: kiss.Setting, value: bytes | int, port: int = 0
+    ) -> None:
         """
         Writes KISS Command Codes to attached device.
 
         http://en.wikipedia.org/wiki/KISS_(TNC)#Command_Codes
 
-        :param name: KISS Command Code Name as a string.
+        :param name: KISS Command Code, or its name as a string ("TX_DELAY").
         :param value: KISS Command Code Value to write.
         :param port: the KISS port (0-15) the setting applies to
         """
         self._logger.debug("Configuring %s=%s on port %d", name, repr(value), port)
 
-        self.kiss_protocol.write_setting(getattr(kiss.Command, name), value, port=port)
+        self.kiss_protocol.write_setting(name, value, port=port)
         self._drain()
+
+    def set_tx_delay(self, ms: float, port: int = 0) -> None:
+        """Key-up delay before sending, in milliseconds (sent in 10 ms steps)."""
+        self.write_setting(kiss.Command.TX_DELAY, kiss.tenths_of_10ms(ms), port=port)
+
+    def set_persistence(self, p: int, port: int = 0) -> None:
+        """CSMA persistence, 0-255: the chance (p+1)/256 of sending in a free slot."""
+        self.write_setting(kiss.Command.PERSISTENCE, p, port=port)
+
+    def set_slot_time(self, ms: float, port: int = 0) -> None:
+        """CSMA slot time in milliseconds (sent in 10 ms steps)."""
+        self.write_setting(kiss.Command.SLOT_TIME, kiss.tenths_of_10ms(ms), port=port)
+
+    def set_tx_tail(self, ms: float, port: int = 0) -> None:
+        """Time to hold the transmitter keyed after a frame, in milliseconds."""
+        self.write_setting(kiss.Command.TX_TAIL, kiss.tenths_of_10ms(ms), port=port)
+
+    def set_full_duplex(self, on: bool, port: int = 0) -> None:
+        """Full duplex: transmit without waiting for a clear channel."""
+        self.write_setting(kiss.Command.FULL_DUPLEX, bool(on), port=port)
 
     def _write_defaults(self, **kwargs: Any) -> None:
         """
@@ -126,7 +149,7 @@ class KISS(SyncFrameDecode):
 class TCPKISS(KISS):
     """KISS TCP Class."""
 
-    def __init__(self, host: str, port: int, strip_df_start: bool = False):
+    def __init__(self, host: str, port: int, strip_df_start: bool = True):
         super().__init__(strip_df_start)
         self.address = (host, int(port))
 
@@ -150,10 +173,29 @@ class TCPKISS(KISS):
 class SerialKISS(KISS):
     """KISS Serial Class."""
 
-    def __init__(self, port: str, speed: str, strip_df_start: bool = False) -> None:
+    def __init__(
+        self,
+        port: str,
+        baudrate: int = 9600,
+        strip_df_start: bool = True,
+        *,
+        speed: int | str | None = None,
+    ) -> None:
+        if speed is not None:
+            warnings.warn(
+                "SerialKISS(speed=...) is deprecated; use baudrate=",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            baudrate = int(speed)
         self.port = port
-        self.speed = speed
+        self.baudrate = int(baudrate)
         super().__init__(strip_df_start)
+
+    @property
+    def speed(self) -> int:
+        """Deprecated name for ``baudrate``."""
+        return self.baudrate
 
     def config_xastir(self) -> None:
         """
@@ -182,7 +224,7 @@ class SerialKISS(KISS):
         _, self.protocol = self.loop.run_until_complete(
             kiss.create_serial_connection(
                 port=self.port,
-                baudrate=int(self.speed),
+                baudrate=self.baudrate,
                 protocol_kwargs={"decoder": self.decoder},
             ),
         )
