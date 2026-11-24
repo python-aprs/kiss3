@@ -87,6 +87,10 @@ def handle_fend(buffer: bytes, strip_df_start: bool = True) -> bytes | None:
 
 _T = TypeVar("_T")
 
+# a KISS frame holds one AX.25 frame (at most a few hundred bytes, twice
+# that if every byte is escaped); leave plenty of headroom
+DEFAULT_MAX_BUFFERED_BYTES = 8192
+
 
 @define
 class GenericKISSDecode(GenericDecoder[_T]):
@@ -100,7 +104,14 @@ class GenericKISSDecode(GenericDecoder[_T]):
     """
 
     strip_df_start: bool = field(default=True)
+    max_buffered_bytes: int = field(default=DEFAULT_MAX_BUFFERED_BYTES, kw_only=True)
+    """
+    Most bytes kept while waiting for a FEND. Past this, the buffered bytes
+    are dropped up to the next FEND, so a stream with no FENDs (the wrong
+    baud rate, a TNC not in KISS mode) can't grow without limit.
+    """
     _last_pframe: bytes = field(default=b"", init=False)
+    _discarding: bool = field(default=False, init=False, repr=False)
 
     def _deframe(self, frame: bytes) -> Iterable[bytes]:
         """The data frame's payload, with the KISS framing removed."""
@@ -117,10 +128,19 @@ class GenericKISSDecode(GenericDecoder[_T]):
             yield cast(_T, payload)
 
     def update(self, new_data: bytes) -> Iterable[_T]:
+        if self._discarding:
+            # skip the rest of an overlong run of bytes, up to the next FEND
+            fend = new_data.find(FEND)
+            if fend < 0:
+                return
+            new_data, self._discarding = new_data[fend:], False
         trail_data_from = new_data.rfind(FEND)
         if trail_data_from < 0:
             # end of frame not found, this is just a chunk
             self._last_pframe = self._last_pframe + new_data
+            if len(self._last_pframe) > self.max_buffered_bytes:
+                log.debug("Dropping %d bytes without a FEND", len(self._last_pframe))
+                self._last_pframe, self._discarding = b"", True
             return
 
         # end of frame found in data:
@@ -136,6 +156,7 @@ class GenericKISSDecode(GenericDecoder[_T]):
 
     def flush(self) -> Iterable[_T]:
         """Call when the stream is closing to decode any final buffered bytes."""
+        self._discarding = False
         if self._last_pframe:
             yield from self.decode_frames(self._last_pframe)
 
