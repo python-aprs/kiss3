@@ -69,8 +69,8 @@ def handle_fend(buffer: bytes, strip_df_start: bool = True) -> bytes | None:
     buffer = bytes(buffer)
     if buffer[:2] == NMEA_SENTENCE_START:
         # T3-Micro style NMEA passthrough
-        return bytes(util.recover_special_codes(util.strip_nmea(buffer)))
-    frame = bytes(util.recover_special_codes(buffer))
+        return util._recover_special_codes(util.strip_nmea(buffer))
+    frame = util._recover_special_codes(buffer)
     if strip_df_start:
         if not frame:
             return None
