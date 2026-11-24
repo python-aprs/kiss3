@@ -135,9 +135,18 @@ class GenericKISSDecode(GenericDecoder[_T]):
             yield from self.decode_frames(kiss_frame)
 
     def flush(self) -> Iterable[_T]:
-        """Call when the stream is closing to decode any final buffered bytes."""
-        if self._last_pframe:
-            yield from self.decode_frames(self._last_pframe)
+        """
+        Call when the stream is closing.
+
+        Bytes after the last FEND are a frame cut off by the connection
+        closing (KISS has no checksum to tell a whole frame from part of
+        one), so they are dropped rather than decoded.
+        """
+        buffered, self._last_pframe = self._last_pframe, b""
+        if buffered:
+            log.debug("Dropping unterminated KISS frame %r", buffered)
+        if None:
+            yield
 
 
 class KISSDecode(GenericKISSDecode[bytes]):

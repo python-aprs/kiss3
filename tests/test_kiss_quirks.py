@@ -93,10 +93,29 @@ def test_frame_without_leading_fend():
     assert decode(b"\x00" + AX25 + FEND + b"\x00" + AX25 + FEND) == [AX25, AX25]
 
 
-def test_unterminated_final_frame_returned_on_flush():
+def test_unterminated_final_frame_dropped_on_flush():
+    """
+    Issue #30: a frame cut off by the connection closing must not be
+    delivered as if it were whole. KISS has no checksum to catch it later.
+    """
     d = kiss.KISSDecode(strip_df_start=True)
     assert list(d.update(FEND + b"\x00" + AX25)) == []
-    assert list(d.flush()) == [AX25]
+    assert list(d.flush()) == []
+    # and the decoder starts clean afterwards
+    assert list(d.update(FEND + b"\x00" + AX25 + FEND)) == [AX25]
+
+
+def test_truncated_message_not_delivered():
+    full = bytes(Frame.ui("APRS", "N0CALL", [], b":KF7HVM   :meet at 5pm at the gate{12"))
+    d = kiss.AX25KISSDecode()
+    assert list(d.update(FEND + b"\x00" + full[:-15])) == []
+    assert list(d.flush()) == []
+
+
+def test_trailing_fends_on_close_are_fine():
+    d = kiss.KISSDecode(strip_df_start=True)
+    assert list(d.update(FEND + b"\x00" + AX25 + FEND + FEND)) == [AX25]
+    assert list(d.flush()) == []
 
 
 @pytest.mark.parametrize(

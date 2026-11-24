@@ -16,10 +16,18 @@ logger = getLogger(__name__)
     "data_buffer,exp_frames",
     (
         (b"", []),
-        (b"12345", [b"12345"]),
-        (constants.FEND.join([b"12345", b"67890"]), [b"12345", b"67890"]),
-        (b"".join([constants.FEND] * 10 + [b"12345"]), [b"12345"]),
+        (b"12345" + constants.FEND, [b"12345"]),
+        (
+            constants.FEND.join([b"12345", b"67890", b""]),
+            [b"12345", b"67890"],
+        ),
+        (b"".join([constants.FEND] * 10 + [b"12345", constants.FEND]), [b"12345"]),
         (b"".join([b"12345"] + [constants.FEND] * 10), [b"12345"]),
+        # issue #30: bytes after the last FEND are a frame cut off when the
+        # connection closed, and are dropped
+        (b"12345", []),
+        (constants.FEND.join([b"12345", b"67890"]), [b"12345"]),
+        (b"".join([constants.FEND] * 10 + [b"12345"]), []),
     ),
 )
 @pytest.mark.parametrize("min_frames", [0, 1, 2, None])
@@ -48,7 +56,8 @@ def test_frame_split(kiss_instance, data_buffer, exp_frames, min_frames, strip_d
 def test_read_write_read_frame(kiss_instance, sample_frame):
     # test_frames.log holds bare AX.25 frames; add the KISS data command byte
     rk = kiss_instance(
-        data_buffer=constants.DATA_FRAME + sample_frame, strip_df_start=True
+        data_buffer=constants.DATA_FRAME + sample_frame + constants.FEND,
+        strip_df_start=True,
     )
     frames = rk.read()
     assert len(frames) == 1
@@ -83,7 +92,9 @@ def test_write_frame(kiss_instance):
 )
 @pytest.mark.parametrize("direction", ["read", "write"])
 def test_read_write_escape(kiss_instance, data, exp_data, direction):
-    k = kiss_instance(data_buffer=b"" if direction == "write" else exp_data)
+    k = kiss_instance(
+        data_buffer=b"" if direction == "write" else exp_data + constants.FEND
+    )
     if direction == "write":
         k.write(data)
         assert (
