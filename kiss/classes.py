@@ -88,12 +88,19 @@ class KISS(SyncFrameDecode):
             return
         loop.run_until_complete(asyncio.sleep(0))
 
-    def write(self, frame: SupportsBytes) -> None:
-        """Write a frame to the TNC and wait for it to be sent."""
-        self.protocol.write(frame)
+    def write(self, frame: SupportsBytes, port: int | None = None) -> None:
+        """
+        Write a frame to the TNC and wait for it to be sent.
+
+        :param port: the KISS port (0-15). None uses the port a received
+            `KISSFrame` came in on, and port 0 for anything else.
+        """
+        self.kiss_protocol.write(frame, port=port)
         self._drain()
 
-    def write_setting(self, name: kiss.Setting, value: bytes | int) -> None:
+    def write_setting(
+        self, name: kiss.Setting, value: bytes | int, port: int = 0
+    ) -> None:
         """
         Writes KISS Command Codes to attached device.
 
@@ -101,31 +108,32 @@ class KISS(SyncFrameDecode):
 
         :param name: KISS Command Code, or its name as a string ("TX_DELAY").
         :param value: KISS Command Code Value to write.
+        :param port: the KISS port (0-15) the setting applies to
         """
-        self._logger.debug("Configuring %s=%s", name, repr(value))
+        self._logger.debug("Configuring %s=%s on port %d", name, repr(value), port)
 
-        self.kiss_protocol.write_setting(name, value)
+        self.kiss_protocol.write_setting(name, value, port=port)
         self._drain()
 
-    def set_tx_delay(self, ms: float) -> None:
+    def set_tx_delay(self, ms: float, port: int = 0) -> None:
         """Key-up delay before sending, in milliseconds (sent in 10 ms steps)."""
-        self.write_setting(kiss.Command.TX_DELAY, kiss.tenths_of_10ms(ms))
+        self.write_setting(kiss.Command.TX_DELAY, kiss.tenths_of_10ms(ms), port=port)
 
-    def set_persistence(self, p: int) -> None:
+    def set_persistence(self, p: int, port: int = 0) -> None:
         """CSMA persistence, 0-255: the chance (p+1)/256 of sending in a free slot."""
-        self.write_setting(kiss.Command.PERSISTENCE, p)
+        self.write_setting(kiss.Command.PERSISTENCE, p, port=port)
 
-    def set_slot_time(self, ms: float) -> None:
+    def set_slot_time(self, ms: float, port: int = 0) -> None:
         """CSMA slot time in milliseconds (sent in 10 ms steps)."""
-        self.write_setting(kiss.Command.SLOT_TIME, kiss.tenths_of_10ms(ms))
+        self.write_setting(kiss.Command.SLOT_TIME, kiss.tenths_of_10ms(ms), port=port)
 
-    def set_tx_tail(self, ms: float) -> None:
+    def set_tx_tail(self, ms: float, port: int = 0) -> None:
         """Time to hold the transmitter keyed after a frame, in milliseconds."""
-        self.write_setting(kiss.Command.TX_TAIL, kiss.tenths_of_10ms(ms))
+        self.write_setting(kiss.Command.TX_TAIL, kiss.tenths_of_10ms(ms), port=port)
 
-    def set_full_duplex(self, on: bool) -> None:
+    def set_full_duplex(self, on: bool, port: int = 0) -> None:
         """Full duplex: transmit without waiting for a clear channel."""
-        self.write_setting(kiss.Command.FULL_DUPLEX, bool(on))
+        self.write_setting(kiss.Command.FULL_DUPLEX, bool(on), port=port)
 
     def _write_defaults(self, **kwargs: Any) -> None:
         """

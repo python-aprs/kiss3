@@ -76,6 +76,23 @@ arrive:
 >>> [str(frame) for frame in decoder.update(stream[10:])]
 ['N0CALL>APRS:>hi']
 
+Multi-port TNCs
+===============
+
+Dual-port TNCs and Dire Wolf with several radio channels put a port number
+(0-15) in the high nibble of the KISS command byte. Decoded frames are
+``kiss.KISSFrame`` objects, an ``ax253.Frame`` with the ``port`` it came in
+on:
+
+>>> port2 = b"\xc0\x20" + bytes(Frame.from_str("N0CALL>APRS:>hi")) + b"\xc0"
+>>> [(frame.port, str(frame)) for frame in kiss.AX25KISSDecode().update(port2)]
+[(2, 'N0CALL>APRS:>hi')]
+
+To send on a port, pass it to ``write(frame, port=2)`` or
+``write_setting("TX_DELAY", 40, port=2)``. A received frame written back
+without a port goes out the port it arrived on. ``AX25KISSDecode(ports={0})``
+ignores frames from other ports.
+
 Detecting a lost connection
 ===========================
 

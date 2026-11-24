@@ -69,6 +69,24 @@ echoes:
 
 Pass ``strip_df_start=False`` to keep the command byte and every frame.
 
+Multi-port TNCs
+===============
+
+The high nibble of the command byte is the KISS port (0-15): dual-port TNCs
+and Dire Wolf with several radio channels use it. ``AX25KISSDecode`` returns
+``KISSFrame`` objects, which are ``ax253.Frame`` objects with the ``port``
+they arrived on. ``ports=`` limits a decoder to some ports:
+
+>>> port1 = b"\xc0\x10" + bytes(Frame.from_str("N0CALL>APRS:>port 1")) + b"\xc0"
+>>> [(f.port, str(f)) for f in kiss.AX25KISSDecode().update(port1)]
+[(1, 'N0CALL>APRS:>port 1')]
+>>> list(kiss.AX25KISSDecode(ports={0}).update(port1))
+[]
+
+``KISSProtocol.write(frame, port=1)`` and ``write_setting(..., port=1)``
+send on a port. Writing a received ``KISSFrame`` without a port sends it out
+the port it came in on, which is what a digipeater wants.
+
 Based on the original ``kiss`` module by Greg Albrecht W2GMD
 (https://github.com/ampledata/kiss), Apache License 2.0.
 """
@@ -81,12 +99,15 @@ from .kiss import (
     AX25KISSDecode,
     Command,
     KISSDecode,
+    KISSFrame,
     KISSProtocol,
+    command_byte,
     connect_serial,
     connect_tcp,
     create_serial_connection,
     create_tcp_connection,
     encode_frame,
+    split_data_frame,
 )
 
 __author__ = "Greg Albrecht W2GMD <oss@undef.net>"
@@ -105,8 +126,11 @@ __all__ = [
     "create_serial_connection",
     "create_tcp_connection",
     "Command",
+    "command_byte",
     "KISSDecode",
+    "KISSFrame",
     "KISSProtocol",
     "SerialKISS",
+    "split_data_frame",
     "TCPKISS",
 ]
