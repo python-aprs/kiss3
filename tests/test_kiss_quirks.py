@@ -166,3 +166,27 @@ def test_kiss_on_off_write_bytes():
     p.transport.data = b""
     p.kiss_off()
     assert p.transport.data == FEND + b"\xff" + FEND + FEND
+
+
+# --- issue #29: a stream with no FENDs can't grow the buffer forever ---
+
+
+def test_buffer_is_bounded_without_fend():
+    decoder = kiss.KISSDecode(strip_df_start=True)
+    for _ in range(100):
+        assert list(decoder.update(b"A" * 1000)) == []
+        assert len(decoder._last_pframe) <= decoder.max_buffered_bytes
+
+
+def test_resyncs_at_the_next_fend_after_dropping():
+    decoder = kiss.KISSDecode(strip_df_start=True, max_buffered_bytes=64)
+    assert list(decoder.update(b"A" * 100)) == []
+    assert list(decoder.update(b"B" * 10)) == []
+    # the tail of the overlong run is dropped too, not decoded as a frame
+    frames = list(decoder.update(b"\x00tail" + FEND + b"\x00" + AX25 + FEND))
+    assert frames == [AX25]
+
+
+def test_ax25_decoder_takes_the_limit():
+    decoder = kiss.AX25KISSDecode(max_buffered_bytes=16)
+    assert decoder.max_buffered_bytes == 16
