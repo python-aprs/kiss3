@@ -18,7 +18,7 @@ Connecting
 
     import kiss
 
-    tnc = kiss.TCPKISS("localhost", 8001, strip_df_start=True)
+    tnc = kiss.TCPKISS("localhost", 8001)
     tnc.start(TX_DELAY=40)
     try:
         tnc.write(Frame.from_str("N0CALL>APRS,WIDE1-1:>on the air"))

@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+import warnings
 from typing import Any, SupportsBytes, cast
 
 from ax253 import SyncFrameDecode
@@ -27,7 +28,7 @@ class KISS(SyncFrameDecode):
     decode_class = kiss.KISSDecode
     _logger = logging.getLogger(__name__)
 
-    def __init__(self, strip_df_start: bool = False) -> None:
+    def __init__(self, strip_df_start: bool = True) -> None:
         super().__init__()
         self.decoder = self.decode_class(strip_df_start=strip_df_start)
 
@@ -120,7 +121,7 @@ class KISS(SyncFrameDecode):
 class TCPKISS(KISS):
     """KISS TCP Class."""
 
-    def __init__(self, host: str, port: int, strip_df_start: bool = False):
+    def __init__(self, host: str, port: int, strip_df_start: bool = True):
         super().__init__(strip_df_start)
         self.address = (host, int(port))
 
@@ -144,10 +145,29 @@ class TCPKISS(KISS):
 class SerialKISS(KISS):
     """KISS Serial Class."""
 
-    def __init__(self, port: str, speed: str, strip_df_start: bool = False) -> None:
+    def __init__(
+        self,
+        port: str,
+        baudrate: int = 9600,
+        strip_df_start: bool = True,
+        *,
+        speed: int | str | None = None,
+    ) -> None:
+        if speed is not None:
+            warnings.warn(
+                "SerialKISS(speed=...) is deprecated; use baudrate=",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            baudrate = int(speed)
         self.port = port
-        self.speed = speed
+        self.baudrate = int(baudrate)
         super().__init__(strip_df_start)
+
+    @property
+    def speed(self) -> int:
+        """Deprecated name for ``baudrate``."""
+        return self.baudrate
 
     def config_xastir(self) -> None:
         """
@@ -176,7 +196,7 @@ class SerialKISS(KISS):
         _, self.protocol = self.loop.run_until_complete(
             kiss.create_serial_connection(
                 port=self.port,
-                baudrate=int(self.speed),
+                baudrate=self.baudrate,
                 protocol_kwargs={"decoder": self.decoder},
             ),
         )

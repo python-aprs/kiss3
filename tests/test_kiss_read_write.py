@@ -83,7 +83,10 @@ def test_write_frame(kiss_instance):
 )
 @pytest.mark.parametrize("direction", ["read", "write"])
 def test_read_write_escape(kiss_instance, data, exp_data, direction):
-    k = kiss_instance(data_buffer=b"" if direction == "write" else exp_data)
+    # raw escaped bytes with no command byte: keep everything
+    k = kiss_instance(
+        data_buffer=b"" if direction == "write" else exp_data, strip_df_start=False
+    )
     if direction == "write":
         k.write(data)
         assert (
@@ -168,3 +171,14 @@ def test_read_ax25(kiss_instance, payload_frame_kiss, payload_frame, min_frames)
     for frame in frames:
         decoded_frame = Frame.from_bytes(frame)
         assert decoded_frame == payload_frame
+
+
+# --- kiss3#33: sync classes strip the command byte by default ---
+
+
+def test_sync_read_strips_command_byte_by_default(kiss_instance):
+    payload = bytes(Frame.from_str("N0CALL>APRS:>hi"))
+    k = kiss_instance(data_buffer=constants.FEND + b"\x00" + payload + constants.FEND)
+    (raw,) = k.read()
+    assert raw == payload
+    assert str(Frame.from_bytes(raw)) == "N0CALL>APRS:>hi"
