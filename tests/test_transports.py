@@ -216,7 +216,7 @@ def _read_fd(fd, n_bytes, timeout=5):
 
 def test_serialkiss_over_pty(pty_pair):
     controller, device = pty_pair
-    k = SerialKISS(device, "9600", strip_df_start=True)
+    k = SerialKISS(device, 9600, strip_df_start=True)
     k.start(TX_DELAY=50)
     try:
         assert _read_fd(controller, 4) == FEND + b"\x01\x32" + FEND
@@ -249,7 +249,7 @@ def test_serialkiss_stop_releases_port(pty_pair):
         pytest.skip("needs /proc to count open file descriptors")
     _, device = pty_pair
     before = _open_fds(device)
-    k = SerialKISS(device, "9600", strip_df_start=True)
+    k = SerialKISS(device, 9600, strip_df_start=True)
     k.start_no_config()
     assert _open_fds(device) == before + 1
     k.stop()
@@ -281,7 +281,7 @@ def test_library_loggers_do_not_configure_logging():
 
 def test_serialkiss_kiss_on(pty_pair):
     controller, device = pty_pair
-    k = SerialKISS(device, "9600")
+    k = SerialKISS(device, 9600)
     k.start_no_config()
     try:
         k.kiss_on()
@@ -357,6 +357,14 @@ def test_util_instance_of_or_and_optional_bool_or_bytes():
 )
 def test_stop_before_start_is_harmless(cls, args):
     cls(*args).stop()
+
+
+def test_serialkiss_baudrate_and_deprecated_speed():
+    assert SerialKISS("/dev/null").baudrate == 9600
+    assert SerialKISS("/dev/null", 4800).baudrate == 4800
+    with pytest.warns(DeprecationWarning):
+        k = SerialKISS("/dev/null", speed="1200")
+    assert k.baudrate == k.speed == 1200
 
 
 # --- kiss3#32: connect_tcp / close ---
