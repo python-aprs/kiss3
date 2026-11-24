@@ -46,7 +46,7 @@ def open_tnc(args: argparse.Namespace) -> kiss.TCPKISS | kiss.SerialKISS:
         tnc = kiss.TCPKISS(host or "localhost", int(port))
         tnc.start()
     else:
-        tnc = kiss.SerialKISS(args.serial, str(args.baud))
+        tnc = kiss.SerialKISS(args.serial, baudrate=args.baud)
         tnc.start_no_config()
         if args.kiss_on:
             tnc.kiss_on()

@@ -28,8 +28,8 @@ and ``read()`` waits for frames:
 
     import kiss
 
-    tnc = kiss.TCPKISS("localhost", 8001, strip_df_start=True)  # Dire Wolf
-    # or: kiss.SerialKISS("/dev/ttyUSB0", 9600, strip_df_start=True)
+    tnc = kiss.TCPKISS("localhost", 8001)  # Dire Wolf
+    # or: kiss.SerialKISS("/dev/ttyUSB0", baudrate=9600)
     tnc.start(TX_DELAY=40)
     try:
         tnc.write(Frame.from_str("N0CALL>APRS,WIDE1-1:>on the air"))
@@ -38,10 +38,10 @@ and ``read()`` waits for frames:
     finally:
         tnc.stop()
 
-``strip_df_start=True`` removes the KISS command byte and drops frames that
-aren't data. Without it, each frame still starts with the command byte
-(``0x00`` for data on port 0) and ``Frame.from_bytes()`` fails with an error
-like ``b'\x00VE3YC' does not match ...``.
+``read()`` returns each data frame's AX.25 bytes, without the KISS command
+byte, and drops frames that aren't data. Pass ``strip_df_start=False`` to get
+every frame with its command byte (``0x00`` for data on port 0); before
+kiss3 9.0 that was the default.
 
 With asyncio, ``create_tcp_connection`` and ``create_serial_connection``
 return a ``KISSProtocol`` whose ``read()`` yields ``ax253.Frame`` objects:
@@ -75,6 +75,23 @@ arrive:
 []
 >>> [str(frame) for frame in decoder.update(stream[10:])]
 ['N0CALL>APRS:>hi']
+
+Multi-port TNCs
+===============
+
+Dual-port TNCs and Dire Wolf with several radio channels put a port number
+(0-15) in the high nibble of the KISS command byte. Decoded frames are
+``kiss.KISSFrame`` objects, an ``ax253.Frame`` with the ``port`` it came in
+on:
+
+>>> port2 = b"\xc0\x20" + bytes(Frame.from_str("N0CALL>APRS:>hi")) + b"\xc0"
+>>> [(frame.port, str(frame)) for frame in kiss.AX25KISSDecode().update(port2)]
+[(2, 'N0CALL>APRS:>hi')]
+
+To send on a port, pass it to ``write(frame, port=2)`` or
+``write_setting("TX_DELAY", 40, port=2)``. A received frame written back
+without a port goes out the port it arrived on. ``AX25KISSDecode(ports={0})``
+ignores frames from other ports.
 
 Detecting a lost connection
 ===========================
